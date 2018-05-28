@@ -259,6 +259,14 @@
     "color_not_found_part1": "El Color ",
     "color_not_found_part2": " no esta disponible, ingrese /color Ayuda para mostar los colores permitidos.",
     "show_color_list": "Colores de chat Disponible: ",
+    "retry_not_counted": "Su operación no cumple con las reglas.",
+    "retry_part1": "Has roto las reglas por la ",
+    "retry_part2": " vez. Vas a ser expulsado de la sala si las rompes por la ",
+    "retry_part3": " vez.",
+    "retry_too_much_part1": "Has sido expulsado de la sala por haber roto las reglas por la ",
+    "retry_too_much_part2": " vez.",
+    "retry_too_much_room_part1": " es expulsado de la sala por haber roto las reglas por la ",
+    "retry_too_much_room_part2": " vez.",
     "athletic_arena_tip": "Durante una Partdida deportiva, un comportamiento de abandono se considera una rendición."
   },
   "zh-cn": {
