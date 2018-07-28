@@ -1110,24 +1110,24 @@
             return list.tcg;
           });
         }
-        if (rule.match(/(^|，|,)(MOOR|OCGONLYMATCHRANDOM)(，|,|$)/)) {
+        if (rule.match(/(^|，|,)(OOMR|OCGONLYMATCHRANDOM)(，|,|$)/)) {
           this.hostinfo.rule = 0;
           this.hostinfo.lflist = 0;
           this.hostinfo.mode = 1;
         }
-        if (rule.match(/(^|，|,)(MOR|OCGMATCHRANDOM)(，|,|$)/)) {
+        if (rule.match(/(^|，|,)(OMR|OCGMATCHRANDOM)(，|,|$)/)) {
           this.hostinfo.rule = 2;
           this.hostinfo.lflist = 0;
           this.hostinfo.mode = 1;
         }
-        if (rule.match(/(^|，|,)(MTOR|TCGONLYMATCHRANDOM)(，|,|$)/)) {
+        if (rule.match(/(^|，|,)(TOMR|TCGONLYMATCHRANDOM)(，|,|$)/)) {
           this.hostinfo.rule = 1;
           this.hostinfo.lflist = _.findIndex(lflists, function(list) {
             return list.tcg;
           });
           this.hostinfo.mode = 1;
         }
-        if (rule.match(/(^|，|,)(MTR|TCGMATCHRANDOM)(，|,|$)/)) {
+        if (rule.match(/(^|，|,)(TMR|TCGMATCHRANDOM)(，|,|$)/)) {
           this.hostinfo.rule = 2;
           this.hostinfo.lflist = _.findIndex(lflists, function(list) {
             return list.tcg;
