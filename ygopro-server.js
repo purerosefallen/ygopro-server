@@ -1791,8 +1791,6 @@
     } else if (info.pass.toUpperCase() === "W" && settings.modules.cloud_replay.enabled) {
       replay_id = Cloud_replay_ids[Math.floor(Math.random() * Cloud_replay_ids.length)];
       redisdb.hgetall("replay:" + replay_id, client.open_cloud_replay);
-    } else if (info.version !== settings.version) {
-
     } else if (!info.pass.length && !settings.modules.random_duel.enabled && !settings.modules.windbot.enabled && !settings.modules.challonge.enabled) {
       ygopro.stoc_die(client, "${blank_room_name}");
     } else if (info.pass.length && settings.modules.mycard.enabled && info.pass.slice(0, 3) !== 'AI#') {

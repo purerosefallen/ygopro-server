@@ -1429,7 +1429,7 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
     replay_id=Cloud_replay_ids[Math.floor(Math.random()*Cloud_replay_ids.length)]
     redisdb.hgetall "replay:"+replay_id, client.open_cloud_replay
 
-  else if info.version != settings.version # and (info.version < 9020 or settings.version != 4927) #强行兼容23333版
+  #else if info.version != settings.version # and (info.version < 9020 or settings.version != 4927) #强行兼容23333版
    # ygopro.stoc_send_chat(client, settings.modules.update, ygopro.constants.COLORS.RED)
    # ygopro.stoc_send client, 'ERROR_MSG', {
    #   msg: 4
