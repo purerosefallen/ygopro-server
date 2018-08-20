@@ -1738,7 +1738,7 @@
   });
 
   ygopro.ctos_follow('JOIN_GAME', false, function(buffer, info, client, server) {
-    var check, decrypted_buffer, finish, i, id, len2, len3, len4, m, n, name, o, pre_room, ref2, ref3, ref4, replay_id, room, secret, struct;
+    var check, decrypted_buffer, finish, i, id, len2, len3, len4, m, n, name, o, pre_room, ref2, ref3, ref4, replay_id, room, secret;
     info.pass = info.pass.trim();
     client.pass = info.pass;
     if (CLIENT_is_able_to_reconnect(client) || CLIENT_is_able_to_kick_reconnect(client)) {
@@ -1800,13 +1800,6 @@
       if (info.pass.length <= 8) {
         ygopro.stoc_die(client, '${invalid_password_length}');
         return;
-      }
-      if (info.version !== settings.version) {
-        info.version = settings.version;
-        struct = ygopro.structs["CTOS_JoinGame"];
-        struct._setBuff(buffer);
-        struct.set("version", info.version);
-        buffer = struct.buffer;
       }
       buffer = new Buffer(info.pass.slice(0, 8), 'base64');
       if (buffer.length !== 6) {
@@ -2114,13 +2107,6 @@
     } else if (info.pass.length && !ROOM_validate(info.pass)) {
       ygopro.stoc_die(client, "${invalid_password_room}");
     } else {
-      if (info.version !== settings.version) {
-        info.version = settings.version;
-        struct = ygopro.structs["CTOS_JoinGame"];
-        struct._setBuff(buffer);
-        struct.set("version", info.version);
-        buffer = struct.buffer;
-      }
       room = ROOM_find_or_create_by_name(info.pass, client.ip);
       if (!room) {
         ygopro.stoc_die(client, "${server_full}");
