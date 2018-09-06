@@ -1026,11 +1026,13 @@ class Room
       decks_list = fs.readdirSync(settings.modules.windbot.random_deck)
       for fname in decks_list when _.endsWith(fname, ".ydk")
         decks_found.push(fname)
-      if decks_found.size > 0
+      console.log _.size(decks_found)
+      if _.size(decks_found) > 0
         botdata.deck = "Test"
-        botdata.deckpath = process.cwd() + "/" + _.sample(decks_found)
+        botdata.deckpath = process.cwd() + "/" + settings.modules.windbot.random_deck + "/" + _.sample(decks_found)
+        console.log botdata.deckpath
     request
-      url: "http://#{settings.modules.windbot.server_ip}:#{settings.modules.windbot.port}/?name=#{encodeURIComponent(botdata.name)}&deck=#{encodeURIComponent(botdata.deck)}&host=#{settings.modules.windbot.my_ip}&port=#{settings.port}&dialog=#{encodeURIComponent(botdata.dialog)}&version=#{settings.version}&password=#{encodeURIComponent(@name)}" + (if botdata.deckpath then "&deckpath=" + botdata.deckpath else "")
+      url: "http://#{settings.modules.windbot.server_ip}:#{settings.modules.windbot.port}/?name=#{encodeURIComponent(botdata.name)}&deck=#{encodeURIComponent(botdata.deck)}&host=#{settings.modules.windbot.my_ip}&port=#{settings.port}&dialog=#{encodeURIComponent(botdata.dialog)}&version=#{settings.version}&password=#{encodeURIComponent(@name)}" + (if botdata.deckpath then "&deckpath=" + encodeURIComponent(botdata.deckpath) else "")
     , (error, response, body)=>
       if error
         log.warn 'windbot add error', error, this.name
