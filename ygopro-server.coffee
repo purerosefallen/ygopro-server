@@ -1021,8 +1021,16 @@ class Room
 
   add_windbot: (botdata)->
     @windbot = botdata
+    if settings.modules.windbot.random_deck
+      decks_found = []
+      decks_list = fs.readdirSync(settings.modules.windbot.random_deck)
+      for fname in decks_list when _.endsWith(fname, ".ydk")
+        decks_found.push(fname)
+      if decks_found.size > 0
+        botdata.deck = "Test"
+        botdata.deckpath = process.cwd() + "/" + _.sample(decks_found)
     request
-      url: "http://#{settings.modules.windbot.server_ip}:#{settings.modules.windbot.port}/?name=#{encodeURIComponent(botdata.name)}&deck=#{encodeURIComponent(botdata.deck)}&host=#{settings.modules.windbot.my_ip}&port=#{settings.port}&dialog=#{encodeURIComponent(botdata.dialog)}&version=#{settings.version}&password=#{encodeURIComponent(@name)}"
+      url: "http://#{settings.modules.windbot.server_ip}:#{settings.modules.windbot.port}/?name=#{encodeURIComponent(botdata.name)}&deck=#{encodeURIComponent(botdata.deck)}&host=#{settings.modules.windbot.my_ip}&port=#{settings.port}&dialog=#{encodeURIComponent(botdata.dialog)}&version=#{settings.version}&password=#{encodeURIComponent(@name)}" + (if botdata.deckpath then "&deckpath=" + botdata.deckpath else "")
     , (error, response, body)=>
       if error
         log.warn 'windbot add error', error, this.name

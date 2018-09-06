@@ -78,6 +78,7 @@
       "enabled": false,
       "botlist": "./windbot/bots.json",
       "spawn": false,
+      "random_deck": false,
       "port": 2399,
       "server_ip": "127.0.0.1",
       "my_ip": "127.0.0.1"

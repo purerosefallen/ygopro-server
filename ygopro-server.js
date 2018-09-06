@@ -1320,9 +1320,24 @@
     };
 
     Room.prototype.add_windbot = function(botdata) {
+      var decks_found, decks_list, fname, len2, m;
       this.windbot = botdata;
+      if (settings.modules.windbot.random_deck) {
+        decks_found = [];
+        decks_list = fs.readdirSync(settings.modules.windbot.random_deck);
+        for (m = 0, len2 = decks_list.length; m < len2; m++) {
+          fname = decks_list[m];
+          if (_.endsWith(fname, ".ydk")) {
+            decks_found.push(fname);
+          }
+        }
+        if (decks_found.size > 0) {
+          botdata.deck = "Test";
+          botdata.deckpath = process.cwd() + "/" + _.sample(decks_found);
+        }
+      }
       request({
-        url: "http://" + settings.modules.windbot.server_ip + ":" + settings.modules.windbot.port + "/?name=" + (encodeURIComponent(botdata.name)) + "&deck=" + (encodeURIComponent(botdata.deck)) + "&host=" + settings.modules.windbot.my_ip + "&port=" + settings.port + "&dialog=" + (encodeURIComponent(botdata.dialog)) + "&version=" + settings.version + "&password=" + (encodeURIComponent(this.name))
+        url: ("http://" + settings.modules.windbot.server_ip + ":" + settings.modules.windbot.port + "/?name=" + (encodeURIComponent(botdata.name)) + "&deck=" + (encodeURIComponent(botdata.deck)) + "&host=" + settings.modules.windbot.my_ip + "&port=" + settings.port + "&dialog=" + (encodeURIComponent(botdata.dialog)) + "&version=" + settings.version + "&password=" + (encodeURIComponent(this.name))) + (botdata.deckpath ? "&deckpath=" + botdata.deckpath : "")
       }, (function(_this) {
         return function(error, response, body) {
           if (error) {
