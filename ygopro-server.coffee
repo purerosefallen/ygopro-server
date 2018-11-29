@@ -1803,6 +1803,8 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
         room_buffer.writeInt32LE(0, buffer_pos)
         buffer_pos += 4
 
+    console.log(room_buffer.length)
+    ygopro.stoc_send(client, "SRVPRO_ROOMLIST", room_buffer)
     setTimeout (()->
       ygopro.stoc_send client, 'ERROR_MSG',{
         msg: 1
