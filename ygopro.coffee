@@ -34,6 +34,17 @@ for name, declaration of structs_declaration
           result[type] field.name
   @structs[name] = result
 
+@buffer_write_string = (buffer, offset, str, length)->
+  temp_struct = Struct()
+  temp_struct.chars("temp", length*2, "UTF-16LE")
+  temp_struct.allocate()
+  temp_struct.set({
+    temp: str
+  })
+  b = temp_struct.buffer()
+  ret = buffer.copy(b, offset)
+  console.log ret
+  return ret
 
 #消息跟踪函数 需要重构, 另暂时只支持异步, 同步没做.
 @stoc_follows = {}

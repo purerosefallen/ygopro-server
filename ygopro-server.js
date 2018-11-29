@@ -2219,8 +2219,7 @@
       buffer_pos += 2;
       for (n = 0, len3 = room_showed.length; n < len3; n++) {
         room = room_showed[n];
-        room_buffer.write(room.name + "\0", buffer_pos, 40, "utf16le");
-        buffer_pos += 40;
+        buffer_pos += ygopro.buffer_write_string(room_buffer, buffer_pos, room.name, 20);
         oppo_pos = room.hostinfo.mode === 2 ? 2 : 1;
         room_buffer.writeUInt8((!room.started ? 0 : room.changing_side ? 2 : 1), buffer_pos);
         buffer_pos++;
@@ -2243,8 +2242,7 @@
         if (room.hostinfo.mode === 2) {
           player_string = player_string + "+" + (room_players[1] ? room_players[1].name : "???");
         }
-        room_buffer.write(player_string + "\0", buffer_pos, 82, "utf16le");
-        buffer_pos += 82;
+        buffer_pos += ygopro.buffer_write_string(room_buffer, buffer_pos, player_string, 41);
         if (room.started) {
           room_buffer.writeInt8((room.scores[room_players[0].name_vpass] != null ? room.scores[room_players[0].name_vpass] : 0), buffer_pos);
           buffer_pos++;
@@ -2263,8 +2261,7 @@
         if (room.hostinfo.mode === 2) {
           player_string = player_string + "+" + (room_players[oppo_pos + 1] ? room_players[oppo_pos + 1].name : "???");
         }
-        room_buffer.write(player_string + "\0", buffer_pos, 82, "utf16le");
-        buffer_pos += 82;
+        buffer_pos += ygopro.buffer_write_string(room_buffer, buffer_pos, player_string, 41);
         if (room.started) {
           room_buffer.writeInt8((room.scores[room_players[oppo_pos].name_vpass] != null ? room.scores[room_players[oppo_pos].name_vpass] : 0), buffer_pos);
           buffer_pos++;

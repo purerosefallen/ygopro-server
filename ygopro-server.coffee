@@ -1756,8 +1756,9 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
     room_buffer.writeUInt16LE(room_showed.length, buffer_pos)
     buffer_pos += 2
     for room in room_showed
-      room_buffer.write(room.name + "\0", buffer_pos, 40, "utf16le")
-      buffer_pos += 40
+      buffer_pos += ygopro.buffer_write_string(room_buffer, buffer_pos, room.name, 20)
+      #room_buffer.write(room.name + "\0", buffer_pos, 40, "utf16le")
+      #buffer_pos += 40
       oppo_pos = if room.hostinfo.mode == 2 then 2 else 1
       room_buffer.writeUInt8((if !room.started then 0 else if room.changing_side then 2 else 1), buffer_pos)
       buffer_pos++
@@ -1773,8 +1774,9 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
         player_string = room_players[0].name
       if room.hostinfo.mode == 2
         player_string = player_string + "+" + (if room_players[1] then room_players[1].name else "???")
-      room_buffer.write(player_string + "\0", buffer_pos, 82, "utf16le")
-      buffer_pos += 82
+      buffer_pos += ygopro.buffer_write_string(room_buffer, buffer_pos, player_string, 41)
+      #room_buffer.write(player_string + "\0", buffer_pos, 82, "utf16le")
+      #buffer_pos += 82
       if room.started
         room_buffer.writeInt8((if room.scores[room_players[0].name_vpass]? then room.scores[room_players[0].name_vpass] else 0), buffer_pos)
         buffer_pos++
@@ -1790,8 +1792,9 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
         player_string = room_players[oppo_pos].name
       if room.hostinfo.mode == 2
         player_string = player_string + "+" + (if room_players[oppo_pos + 1] then room_players[oppo_pos + 1].name else "???")
-      room_buffer.write(player_string + "\0", buffer_pos, 82, "utf16le")
-      buffer_pos += 82
+      buffer_pos += ygopro.buffer_write_string(room_buffer, buffer_pos, player_string, 41)
+      #room_buffer.write(player_string + "\0", buffer_pos, 82, "utf16le")
+      #buffer_pos += 82
       if room.started
         room_buffer.writeInt8((if room.scores[room_players[oppo_pos].name_vpass]? then room.scores[room_players[oppo_pos].name_vpass] else 0), buffer_pos)
         buffer_pos++

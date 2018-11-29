@@ -56,6 +56,20 @@
     this.structs[name] = result;
   }
 
+  this.buffer_write_string = function(buffer, offset, str, length) {
+    var b, ret, temp_struct;
+    temp_struct = Struct();
+    temp_struct.chars("temp", length * 2, "UTF-16LE");
+    temp_struct.allocate();
+    temp_struct.set({
+      temp: str
+    });
+    b = temp_struct.buffer();
+    ret = buffer.copy(b, offset);
+    console.log(ret);
+    return ret;
+  };
+
   this.stoc_follows = {};
 
   this.ctos_follows = {};
