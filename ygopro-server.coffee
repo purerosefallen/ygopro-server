@@ -1763,7 +1763,7 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
       buffer_pos++
       room_buffer.writeInt8(room.duel_count, buffer_pos)
       buffer_pos++
-      room_buffer.writeInt8((if room.turn? then room.turn else) 0, buffer_pos)
+      room_buffer.writeInt8((if room.turn? then room.turn else 0), buffer_pos)
       buffer_pos++
       room_players = []
       for player in room.get_playing_player() when player

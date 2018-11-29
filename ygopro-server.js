@@ -2226,7 +2226,7 @@
         buffer_pos++;
         room_buffer.writeInt8(room.duel_count, buffer_pos);
         buffer_pos++;
-        room_buffer.writeInt8((room.turn != null ? room.turn : void 0)(0, buffer_pos));
+        room_buffer.writeInt8((room.turn != null ? room.turn : 0), buffer_pos);
         buffer_pos++;
         room_players = [];
         ref3 = room.get_playing_player();
