@@ -1777,12 +1777,12 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
       buffer_pos += 41
       if room.started
         room_buffer.writeInt8((if room.scores[player[0].name_vpass] then room.scores[player[0].name_vpass] else 0), buffer_pos)
-        buffer_pos += 1
+        buffer_pos++
         room_buffer.writeInt32LE((if player[0].lp then player[0].lp else room.hostinfo.start_lp), buffer_pos)
         buffer_pos += 4
       else
         room_buffer.writeInt8(0, buffer_pos)
-        buffer_pos += 1
+        buffer_pos++
         room_buffer.writeInt32LE(0, buffer_pos)
         buffer_pos += 4
       player_string = "???"
@@ -1794,12 +1794,12 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
       buffer_pos += 41
       if room.started
         room_buffer.writeInt8((if room.scores[player[oppo_pos].name_vpass] then room.scores[player[oppo_pos].name_vpass] else 0), buffer_pos)
-        buffer_pos += 1
+        buffer_pos++
         room_buffer.writeInt32LE((if player[oppo_pos].lp then player[oppo_pos].lp else room.hostinfo.start_lp), buffer_pos)
         buffer_pos += 4
       else
         room_buffer.writeInt8(0, buffer_pos)
-        buffer_pos += 1
+        buffer_pos++
         room_buffer.writeInt32LE(0, buffer_pos)
         buffer_pos += 4
 

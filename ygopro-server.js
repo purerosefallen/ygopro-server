@@ -2247,12 +2247,12 @@
         buffer_pos += 41;
         if (room.started) {
           room_buffer.writeInt8((room.scores[player[0].name_vpass] ? room.scores[player[0].name_vpass] : 0), buffer_pos);
-          buffer_pos += 1;
+          buffer_pos++;
           room_buffer.writeInt32LE((player[0].lp ? player[0].lp : room.hostinfo.start_lp), buffer_pos);
           buffer_pos += 4;
         } else {
           room_buffer.writeInt8(0, buffer_pos);
-          buffer_pos += 1;
+          buffer_pos++;
           room_buffer.writeInt32LE(0, buffer_pos);
           buffer_pos += 4;
         }
@@ -2267,12 +2267,12 @@
         buffer_pos += 41;
         if (room.started) {
           room_buffer.writeInt8((room.scores[player[oppo_pos].name_vpass] ? room.scores[player[oppo_pos].name_vpass] : 0), buffer_pos);
-          buffer_pos += 1;
+          buffer_pos++;
           room_buffer.writeInt32LE((player[oppo_pos].lp ? player[oppo_pos].lp : room.hostinfo.start_lp), buffer_pos);
           buffer_pos += 4;
         } else {
           room_buffer.writeInt8(0, buffer_pos);
-          buffer_pos += 1;
+          buffer_pos++;
           room_buffer.writeInt32LE(0, buffer_pos);
           buffer_pos += 4;
         }
