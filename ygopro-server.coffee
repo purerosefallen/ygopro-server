@@ -1752,7 +1752,7 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
     for room in ROOM_all when room and room.established and room.name.indexOf('$') < 0
       room_showed.push(room)
     buffer_pos = 0
-    room_buffer = Buffer.allocUnsafe(2 + 217 * room_showed.length)
+    room_buffer = Buffer.alloc(2 + 217 * room_showed.length)
     room_buffer.writeUInt16LE(room_showed.length, buffer_pos)
     buffer_pos += 2
     for room in room_showed

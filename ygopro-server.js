@@ -2214,7 +2214,7 @@
         }
       }
       buffer_pos = 0;
-      room_buffer = Buffer.allocUnsafe(2 + 217 * room_showed.length);
+      room_buffer = Buffer.alloc(2 + 217 * room_showed.length);
       room_buffer.writeUInt16LE(room_showed.length, buffer_pos);
       buffer_pos += 2;
       for (n = 0, len3 = room_showed.length; n < len3; n++) {
