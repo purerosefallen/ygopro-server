@@ -1776,9 +1776,9 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
       room_buffer.write(player_string, buffer_pos, 41, "utf16le")
       buffer_pos += 41
       if room.started
-        room_buffer.writeInt8((if room.scores[player[0].name_vpass] then room.scores[player[0].name_vpass] else 0), buffer_pos)
+        room_buffer.writeInt8((if room.scores[player[0].name_vpass]? then room.scores[player[0].name_vpass] else 0), buffer_pos)
         buffer_pos++
-        room_buffer.writeInt32LE((if player[0].lp then player[0].lp else room.hostinfo.start_lp), buffer_pos)
+        room_buffer.writeInt32LE((if player[0].lp? then player[0].lp else room.hostinfo.start_lp), buffer_pos)
         buffer_pos += 4
       else
         room_buffer.writeInt8(0, buffer_pos)
@@ -1793,9 +1793,9 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server)->
       room_buffer.write(player_string, buffer_pos, 41, "utf16le")
       buffer_pos += 41
       if room.started
-        room_buffer.writeInt8((if room.scores[player[oppo_pos].name_vpass] then room.scores[player[oppo_pos].name_vpass] else 0), buffer_pos)
+        room_buffer.writeInt8((if room.scores[player[oppo_pos].name_vpass]? then room.scores[player[oppo_pos].name_vpass] else 0), buffer_pos)
         buffer_pos++
-        room_buffer.writeInt32LE((if player[oppo_pos].lp then player[oppo_pos].lp else room.hostinfo.start_lp), buffer_pos)
+        room_buffer.writeInt32LE((if player[oppo_pos].lp? then player[oppo_pos].lp else room.hostinfo.start_lp), buffer_pos)
         buffer_pos += 4
       else
         room_buffer.writeInt8(0, buffer_pos)
