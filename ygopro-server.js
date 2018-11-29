@@ -2277,7 +2277,6 @@
           buffer_pos += 4;
         }
       }
-      console.log(room_buffer.length);
       ygopro.stoc_send(client, "SRVPRO_ROOMLIST", room_buffer);
       setTimeout((function() {
         ygopro.stoc_send(client, 'ERROR_MSG', {
