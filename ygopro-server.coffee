@@ -992,10 +992,12 @@ CLIENT_send_replays = (client, room) ->
   return true
 
 SOCKET_flush_data = (sk, datas) ->
+  if !sk or sk.closed
+    return false
   for buffer in datas
     sk.write(buffer)
   datas.splice(0, datas.length)
-  return
+  return true
 
 class Room
   constructor: (name, @hostinfo) ->
@@ -2719,10 +2721,10 @@ ygopro.stoc_follow 'DUEL_END', false, (buffer, info, client, server, datas)->
   return unless room and settings.modules.replay_delay and room.hostinfo.mode == 1
   SOCKET_flush_data(client, datas)
   CLIENT_send_replays(client, room)
-  if !room.replays_sent_to_watchers
+  if !room.replays_sent_to_watchers and (client.pos == 0 or !room.dueling_players[0] or room.dueling_players[0].closed)
     room.replays_sent_to_watchers = true
-    # for player in room.players when player and player.pos > 3
-    #   CLIENT_send_replays(player, room)
+    for player in room.players when player and player.pos > 3
+      CLIENT_send_replays(player, room)
     for player in room.watchers when player
       CLIENT_send_replays(player, room)
 
