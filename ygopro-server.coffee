@@ -868,8 +868,13 @@ CLIENT_send_replays = (client, room) ->
 SOCKET_flush_data = (sk, datas) ->
   if !sk or sk.closed
     return false
-  for buffer in datas
-    sk.write(buffer)
+  if sk.is_post_watcher
+    room=ROOM_all[sk.rid]
+    if room and room.watcher
+      room.watcher.write buffer for buffer in datas
+  else
+    for buffer in datas
+      sk.write(buffer)
   datas.splice(0, datas.length)
   return true
 
@@ -1410,10 +1415,10 @@ net.createServer (client) ->
   client.pre_establish_buffers = new Array()
 
   client.on 'data', (ctos_buffer) ->
-    if client.is_post_watcher
-      room=ROOM_all[client.rid]
-      room.watcher.write ctos_buffer if room and !CLIENT_is_banned_by_mc(client)
-    else
+   # if client.is_post_watcher
+   #   room=ROOM_all[client.rid]
+   #   room.watcher.write ctos_buffer if room and !CLIENT_is_banned_by_mc(client)
+   # else
       #ctos_buffer = Buffer.alloc(0)
       ctos_message_length = 0
       ctos_proto = 0
@@ -1473,7 +1478,11 @@ net.createServer (client) ->
           break
       if !client.server
         return
-      if client.established
+      if client.is_post_watcher
+        room=ROOM_all[client.rid]
+        if room and room.watcher
+          room.watcher.write buffer for buffer in datas
+      else if client.established
         client.server.write buffer for buffer in datas
       else
         client.pre_establish_buffers.push buffer for buffer in datas
@@ -2055,7 +2064,7 @@ ygopro.stoc_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
       return unless room
       room.watcher_buffers.push data
       for w in room.watchers
-        w.write data if w #a WTF fix
+        w.server.write data if w and w.server #a WTF fix
       return
 
     watcher.on 'error', (error)->

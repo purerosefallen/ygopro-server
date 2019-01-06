@@ -1805,95 +1805,103 @@
     }
     client.pre_establish_buffers = new Array();
     client.on('data', function(ctos_buffer) {
-      var b, bad_ip_count, buffer, cancel, ctos_message_length, ctos_proto, datas, info, len2, len3, looplimit, m, n, room, struct;
-      if (client.is_post_watcher) {
-        room = ROOM_all[client.rid];
-        if (room && !CLIENT_is_banned_by_mc(client)) {
-          room.watcher.write(ctos_buffer);
-        }
-      } else {
-        ctos_message_length = 0;
-        ctos_proto = 0;
-        datas = [];
-        looplimit = 0;
-        while (true) {
-          if (ctos_message_length === 0) {
-            if (ctos_buffer.length >= 2) {
-              ctos_message_length = ctos_buffer.readUInt16LE(0);
-            } else {
-              if (ctos_buffer.length !== 0) {
-                log.warn("bad ctos_buffer length", client.ip);
-              }
-              break;
-            }
-          } else if (ctos_proto === 0) {
-            if (ctos_buffer.length >= 3) {
-              ctos_proto = ctos_buffer.readUInt8(2);
-            } else {
-              log.warn("bad ctos_proto length", client.ip);
-              break;
-            }
+      var b, bad_ip_count, buffer, cancel, ctos_message_length, ctos_proto, datas, info, len2, len3, len4, looplimit, m, n, o, results, results1, results2, room, struct;
+      ctos_message_length = 0;
+      ctos_proto = 0;
+      datas = [];
+      looplimit = 0;
+      while (true) {
+        if (ctos_message_length === 0) {
+          if (ctos_buffer.length >= 2) {
+            ctos_message_length = ctos_buffer.readUInt16LE(0);
           } else {
-            if (ctos_buffer.length >= 2 + ctos_message_length) {
-              cancel = false;
-              if (settings.modules.reconnect.enabled && client.pre_reconnecting && ygopro.constants.CTOS[ctos_proto] !== 'UPDATE_DECK') {
-                cancel = true;
-              }
-              if (ygopro.ctos_follows[ctos_proto] && !cancel) {
-                b = ctos_buffer.slice(3, ctos_message_length - 1 + 3);
-                info = null;
-                if (struct = ygopro.structs[ygopro.proto_structs.CTOS[ygopro.constants.CTOS[ctos_proto]]]) {
-                  struct._setBuff(b);
-                  info = _.clone(struct.fields);
-                }
-                if (ygopro.ctos_follows[ctos_proto].synchronous) {
-                  cancel = ygopro.ctos_follows[ctos_proto].callback(b, info, client, client.server, datas);
-                } else {
-                  ygopro.ctos_follows[ctos_proto].callback(b, info, client, client.server, datas);
-                }
-              }
-              if (!cancel) {
-                datas.push(ctos_buffer.slice(0, 2 + ctos_message_length));
-              }
-              ctos_buffer = ctos_buffer.slice(2 + ctos_message_length);
-              ctos_message_length = 0;
-              ctos_proto = 0;
-            } else {
-              if (ctos_message_length !== 17735) {
-                log.warn("bad ctos_message length", client.ip, ctos_buffer.length, ctos_message_length, ctos_proto);
-              }
-              break;
+            if (ctos_buffer.length !== 0) {
+              log.warn("bad ctos_buffer length", client.ip);
             }
+            break;
           }
-          looplimit++;
-          if (looplimit > 800 || ROOM_bad_ip[client.ip] > 5) {
-            log.info("error ctos", client.name, client.ip);
-            bad_ip_count = ROOM_bad_ip[client.ip];
-            if (bad_ip_count) {
-              ROOM_bad_ip[client.ip] = bad_ip_count + 1;
-            } else {
-              ROOM_bad_ip[client.ip] = 1;
+        } else if (ctos_proto === 0) {
+          if (ctos_buffer.length >= 3) {
+            ctos_proto = ctos_buffer.readUInt8(2);
+          } else {
+            log.warn("bad ctos_proto length", client.ip);
+            break;
+          }
+        } else {
+          if (ctos_buffer.length >= 2 + ctos_message_length) {
+            cancel = false;
+            if (settings.modules.reconnect.enabled && client.pre_reconnecting && ygopro.constants.CTOS[ctos_proto] !== 'UPDATE_DECK') {
+              cancel = true;
             }
-            CLIENT_kick(client);
+            if (ygopro.ctos_follows[ctos_proto] && !cancel) {
+              b = ctos_buffer.slice(3, ctos_message_length - 1 + 3);
+              info = null;
+              if (struct = ygopro.structs[ygopro.proto_structs.CTOS[ygopro.constants.CTOS[ctos_proto]]]) {
+                struct._setBuff(b);
+                info = _.clone(struct.fields);
+              }
+              if (ygopro.ctos_follows[ctos_proto].synchronous) {
+                cancel = ygopro.ctos_follows[ctos_proto].callback(b, info, client, client.server, datas);
+              } else {
+                ygopro.ctos_follows[ctos_proto].callback(b, info, client, client.server, datas);
+              }
+            }
+            if (!cancel) {
+              datas.push(ctos_buffer.slice(0, 2 + ctos_message_length));
+            }
+            ctos_buffer = ctos_buffer.slice(2 + ctos_message_length);
+            ctos_message_length = 0;
+            ctos_proto = 0;
+          } else {
+            if (ctos_message_length !== 17735) {
+              log.warn("bad ctos_message length", client.ip, ctos_buffer.length, ctos_message_length, ctos_proto);
+            }
             break;
           }
         }
-        if (!client.server) {
-          return;
-        }
-        if (client.established) {
-          for (m = 0, len2 = datas.length; m < len2; m++) {
-            buffer = datas[m];
-            client.server.write(buffer);
+        looplimit++;
+        if (looplimit > 800 || ROOM_bad_ip[client.ip] > 5) {
+          log.info("error ctos", client.name, client.ip);
+          bad_ip_count = ROOM_bad_ip[client.ip];
+          if (bad_ip_count) {
+            ROOM_bad_ip[client.ip] = bad_ip_count + 1;
+          } else {
+            ROOM_bad_ip[client.ip] = 1;
           }
-        } else {
-          for (n = 0, len3 = datas.length; n < len3; n++) {
-            buffer = datas[n];
-            client.pre_establish_buffers.push(buffer);
-          }
+          CLIENT_kick(client);
+          break;
         }
       }
+      if (!client.server) {
+        return;
+      }
+      if (client.is_post_watcher) {
+        room = ROOM_all[client.rid];
+        if (room && room.watcher) {
+          results = [];
+          for (m = 0, len2 = datas.length; m < len2; m++) {
+            buffer = datas[m];
+            results.push(room.watcher.write(buffer));
+          }
+          return results;
+        }
+      } else if (client.established) {
+        results1 = [];
+        for (n = 0, len3 = datas.length; n < len3; n++) {
+          buffer = datas[n];
+          results1.push(client.server.write(buffer));
+        }
+        return results1;
+      } else {
+        results2 = [];
+        for (o = 0, len4 = datas.length; o < len4; o++) {
+          buffer = datas[o];
+          results2.push(client.pre_establish_buffers.push(buffer));
+        }
+        return results2;
+      }
     });
+    return;
     server.on('data', function(stoc_buffer) {
       var b, buffer, cancel, datas, info, len2, looplimit, m, stanzas, stoc_message_length, stoc_proto, struct;
       stoc_message_length = 0;
@@ -2528,8 +2536,8 @@
         ref3 = room.watchers;
         for (n = 0, len3 = ref3.length; n < len3; n++) {
           w = ref3[n];
-          if (w) {
-            w.write(data);
+          if (w && w.server) {
+            w.server.write(data);
           }
         }
       });
