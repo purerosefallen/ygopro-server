@@ -486,6 +486,7 @@
       });
     };
     challonge.participants._index = function(_data) {
+      var err;
       if (settings.modules.challonge.cache_ttl && challonge_cache[0]) {
         _data.callback(null, challonge_cache[0]);
       } else if (is_requesting[0] && moment() - is_requesting[0] <= 5000) {
@@ -493,10 +494,16 @@
       } else {
         _data.callback = get_callback(0, _data.callback);
         is_requesting[0] = moment();
-        challonge.participants.index(_data);
+        try {
+          challonge.participants.index(_data);
+        } catch (error1) {
+          err = error1;
+          _data.callback(err, null);
+        }
       }
     };
     challonge.matches._index = function(_data) {
+      var err;
       if (settings.modules.challonge.cache_ttl && challonge_cache[1]) {
         _data.callback(null, challonge_cache[1]);
       } else if (is_requesting[1] && moment() - is_requesting[1] <= 5000) {
@@ -504,7 +511,21 @@
       } else {
         _data.callback = get_callback(1, _data.callback);
         is_requesting[1] = moment();
-        challonge.matches.index(_data);
+        try {
+          challonge.matches.index(_data);
+        } catch (error1) {
+          err = error1;
+          _data.callback(err, null);
+        }
+      }
+    };
+    challonge.matches._update = function(_data) {
+      var err;
+      try {
+        challonge.matches.update(_data);
+      } catch (error1) {
+        err = error1;
+        log.warn("Errored pushing scores to Challonge.", err);
       }
     };
     refresh_challonge_cache = function() {
@@ -1225,7 +1246,7 @@
   };
 
   CLIENT_heartbeat_register = function(client, send) {
-    if (!settings.modules.heartbeat_detection.enabled || client.closed || client.is_post_watcher || client.pre_reconnecting || client.reconnecting || client.pos > 3 || client.heartbeat_protected) {
+    if (!settings.modules.heartbeat_detection.enabled || client.closed || client.is_post_watcher || client.pre_reconnecting || client.reconnecting || client.waiting_for_last || client.pos > 3 || client.heartbeat_protected) {
       return false;
     }
     if (client.heartbeat_timeout) {
@@ -1608,7 +1629,7 @@
         })(this));
       }
       if (settings.modules.challonge.enabled && this.started && this.hostinfo.mode !== 2 && !this.kicked) {
-        challonge.matches.update({
+        challonge.matches._update({
           id: settings.modules.challonge.tournament_id,
           matchId: this.challonge_info.id,
           match: this.get_challonge_score(),
@@ -3420,8 +3441,9 @@
       return true;
     }
     client.reconnecting = false;
-    if (client.last_game_msg && client.last_game_msg_title !== 'WAITING') {
-      SOCKET_flush_data(client, datas);
+    if (client.time_confirm_required) {
+      client.waiting_for_last = true;
+    } else if (client.last_game_msg && client.last_game_msg_title !== 'WAITING') {
       if (client.last_hint_msg) {
         ygopro.stoc_send(client, 'GAME_MSG', client.last_hint_msg);
       }
@@ -4256,6 +4278,15 @@
       return;
     }
     if (settings.modules.reconnect.enabled) {
+      if (client.waiting_for_last) {
+        client.waiting_for_last = false;
+        if (client.last_game_msg && client.last_game_msg_title !== 'WAITING') {
+          if (client.last_hint_msg) {
+            ygopro.stoc_send(client, 'GAME_MSG', client.last_hint_msg);
+          }
+          ygopro.stoc_send(client, 'GAME_MSG', client.last_game_msg);
+        }
+      }
       client.time_confirm_required = false;
     }
     if (settings.modules.heartbeat_detection.enabled) {
@@ -4422,7 +4453,7 @@
     if (settings.modules.challonge.enabled && settings.modules.challonge.post_score_midduel && room.hostinfo.mode !== 2 && client.pos === 0) {
       temp_log = JSON.parse(JSON.stringify(room.get_challonge_score()));
       delete temp_log.winnerId;
-      challonge.matches.update({
+      challonge.matches._update({
         id: settings.modules.challonge.tournament_id,
         matchId: room.challonge_info.id,
         match: temp_log,
