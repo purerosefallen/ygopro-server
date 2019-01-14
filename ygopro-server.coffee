@@ -69,7 +69,8 @@ import_datas = [
   "last_hint_msg",
   "start_deckbuf",
   "challonge_info",
-  "ready_trap"
+  "ready_trap",
+  "replays_sent"
 ]
 
 merge = require 'deepmerge'
@@ -997,7 +998,8 @@ CLIENT_get_partner = (client) ->
     return room.dueling_players[5 - client.pos]
 
 CLIENT_send_replays = (client, room) ->
-  return false unless settings.modules.replay_delay and room.replays.length and room.hostinfo.mode == 1
+  return false unless settings.modules.replay_delay and room.replays.length and room.hostinfo.mode == 1 and !client.replays_sent and !client.closed
+  client.replays_sent = true
   i = 0
   for buffer in room.replays
     ++i
@@ -2733,7 +2735,7 @@ ygopro.stoc_follow 'DUEL_END', false, (buffer, info, client, server, datas)->
   return unless room and settings.modules.replay_delay and room.hostinfo.mode == 1
   SOCKET_flush_data(client, datas)
   CLIENT_send_replays(client, room)
-  if !room.replays_sent_to_watchers and (client.pos == 0 or !room.dueling_players[0] or room.dueling_players[0].closed)
+  if !room.replays_sent_to_watchers
     room.replays_sent_to_watchers = true
     for player in room.players when player and player.pos > 3
       CLIENT_send_replays(player, room)
