@@ -78,6 +78,11 @@
       "enabled": false,
       "generate_count": 500
     },
+    "pre_release_compat": {
+      "enabled": false,
+      "official_database": "./ygopro/cards.cdb",
+      "pre_release_database": "./../ygopro-pre-data/expansions/pre-release.cdb"
+    },
     "random_duel": {
       "enabled": false,
       "no_rematch_check": false,
@@ -238,7 +243,7 @@
             "command": "bash",
             "args": [
               "-c",
-              "cd ocgcore ; git pull origin master ; cd ../script ; git pull origin master ; cd .. ; premake5 gmake ; cd build ; make config=release ; cd .. ; strip ygopro"
+              "cd ocgcore ; git pull origin master ; cd ../script ; git pull origin master ; cd .. ; ~/premake5 gmake ; cd build ; make config=release ; cd .. ; strip ygopro"
             ],
             "path": "./ygopro/"
           }
