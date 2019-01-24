@@ -3290,13 +3290,13 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
     CLIENT_kick(room.dueling_players[oppo_pos - win_pos])
     CLIENT_kick(room.dueling_players[oppo_pos - win_pos + 1]) if room.hostinfo.mode == 2
     return true
+  struct = ygopro.structs["deck"]
+  struct._setBuff(buffer)
   if room.random_type or room.arena
     if client.pos == 0
       room.waiting_for_player = room.waiting_for_player2
     room.last_active_time = moment()
   else if !room.started and settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.deck_check and fs.readdirSync(settings.modules.tournament_mode.deck_path).length
-    struct = ygopro.structs["deck"]
-    struct._setBuff(buffer)
     struct.set("mainc", 1)
     struct.set("sidec", 1)
     struct.set("deckbuf", [4392470, 4392470])
@@ -3353,13 +3353,11 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
         found = true
       buff_side_new.push(code_)
     if found
-      compat_struct = ygopro.structs["deck"]
-      compat_struct._setBuff(buffer)
       compat_deckbuf = buff_main_new.concat(buff_side_new)
-      compat_struct.set("mainc", buff_main_new.length)
-      compat_struct.set("sidec", buff_side_new.length)
-      compat_struct.set("deckbuf", compat_deckbuf)
-      buffer = compat_struct.buffer
+      struct.set("mainc", buff_main_new.length)
+      struct.set("sidec", buff_side_new.length)
+      struct.set("deckbuf", compat_deckbuf)
+      buffer = struct.buffer
       client.main = buff_main_new
       client.side = buff_side_new
     if !room.started
