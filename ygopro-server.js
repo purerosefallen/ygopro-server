@@ -1398,18 +1398,26 @@
             } else {
               temp_list[result.name] = result.id;
             }
-          }, function() {
-            official_database.each("select id,name from texts", function(err, result) {
-              var official_code, pre_release_code;
-              if (err) {
-                log.warn("Error loading official database.", err);
-              } else if (temp_list[result.name] && temp_list[result.name] !== result.id) {
-                official_code = result.id;
-                pre_release_code = temp_list[result.name];
-                list_official_to_pre[official_code] = pre_release_code;
-                list_pre_to_official[pre_release_code] = official_code;
-              }
-            });
+          }, function(err) {
+            if (err) {
+              log.warn("Error loaded pre-release database.", err);
+            } else {
+              official_database.each("select id,name from texts", function(err, result) {
+                var official_code, pre_release_code;
+                if (err) {
+                  log.warn("Error loading official database.", err);
+                } else if (temp_list[result.name] && temp_list[result.name] !== result.id) {
+                  official_code = result.id;
+                  pre_release_code = temp_list[result.name];
+                  list_official_to_pre[official_code] = pre_release_code;
+                  list_pre_to_official[pre_release_code] = official_code;
+                }
+              }, function(err) {
+                if (err) {
+                  log.warn("Error loaded official database.", err);
+                }
+              });
+            }
           });
         } catch (error1) {
           error = error1;

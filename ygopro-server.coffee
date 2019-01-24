@@ -1074,20 +1074,24 @@ class Room
           else
             temp_list[result.name] = result.id
           return
-        , () ->
-          official_database.each("select id,name from texts", (err, result) ->
-            if err
-              log.warn("Error loading official database.", err)
-            else if temp_list[result.name] and temp_list[result.name] != result.id
-              official_code = result.id
-              pre_release_code = temp_list[result.name]
-              list_official_to_pre[official_code] = pre_release_code
-              list_pre_to_official[pre_release_code] = official_code
-            return
-          #, () ->
-          #  console.log("Load success.")
-          #  return
-          )
+        , (err) ->
+          if err
+            log.warn("Error loaded pre-release database.", err)
+          else
+            official_database.each("select id,name from texts", (err, result) ->
+              if err
+                log.warn("Error loading official database.", err)
+              else if temp_list[result.name] and temp_list[result.name] != result.id
+                official_code = result.id
+                pre_release_code = temp_list[result.name]
+                list_official_to_pre[official_code] = pre_release_code
+                list_pre_to_official[pre_release_code] = official_code
+              return
+            , (err) ->
+              if err
+                log.warn("Error loaded official database.", err)
+              return
+            )
           return
         )
       catch error
