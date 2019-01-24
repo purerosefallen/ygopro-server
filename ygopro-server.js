@@ -4151,7 +4151,7 @@
   });
 
   ygopro.ctos_follow('UPDATE_DECK', true, function(buffer, info, client, server, datas) {
-    var buff_main, buff_main_new, buff_side, buff_side_new, card, code, code_, compat_deckbuf, compat_struct, current_deck, deck, deck_array, deck_main, deck_side, deck_text, deckbuf, decks, found, found_deck, i, len3, len4, len5, len6, line, m, n, o, oppo_pos, p, room, struct, win_pos;
+    var buff_main, buff_main_new, buff_side, buff_side_new, card, code, code_, compat_deckbuf, current_deck, deck, deck_array, deck_main, deck_side, deck_text, deckbuf, decks, found, found_deck, i, len3, len4, len5, len6, line, m, n, o, oppo_pos, p, room, struct, win_pos;
     if (settings.modules.reconnect.enabled && client.pre_reconnecting) {
       if (!CLIENT_is_able_to_reconnect(client) && !CLIENT_is_able_to_kick_reconnect(client)) {
         ygopro.stoc_send_chat(client, "${reconnect_failed}", ygopro.constants.COLORS.RED);
@@ -4227,14 +4227,14 @@
       }
       return true;
     }
+    struct = ygopro.structs["deck"];
+    struct._setBuff(buffer);
     if (room.random_type || room.arena) {
       if (client.pos === 0) {
         room.waiting_for_player = room.waiting_for_player2;
       }
       room.last_active_time = moment();
     } else if (!room.started && settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.deck_check && fs.readdirSync(settings.modules.tournament_mode.deck_path).length) {
-      struct = ygopro.structs["deck"];
-      struct._setBuff(buffer);
       struct.set("mainc", 1);
       struct.set("sidec", 1);
       struct.set("deckbuf", [4392470, 4392470]);
@@ -4307,13 +4307,11 @@
         buff_side_new.push(code_);
       }
       if (found) {
-        compat_struct = ygopro.structs["deck"];
-        compat_struct._setBuff(buffer);
         compat_deckbuf = buff_main_new.concat(buff_side_new);
-        compat_struct.set("mainc", buff_main_new.length);
-        compat_struct.set("sidec", buff_side_new.length);
-        compat_struct.set("deckbuf", compat_deckbuf);
-        buffer = compat_struct.buffer;
+        struct.set("mainc", buff_main_new.length);
+        struct.set("sidec", buff_side_new.length);
+        struct.set("deckbuf", compat_deckbuf);
+        buffer = struct.buffer;
         client.main = buff_main_new;
         client.side = buff_side_new;
       }
