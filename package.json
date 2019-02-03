@@ -1,21 +1,30 @@
 {
-  "name": "ygopro-server",
+  "name": "srvpro",
   "version": "2.3.3",
   "description": "a server for ygopro",
-  "repository": "github:mycard/ygopro-server",
+  "repository": "github:mycard/srvpro",
   "keywords": [
     "mycard",
     "ygopro",
+    "srvpro",
     "server"
   ],
-  "author": "zh99998 <zh99998@gmail.com>, mercury233 <me@mercury233.me>",
+  "author": "zh99998 <zh99998@gmail.com>, mercury233 <me@mercury233.me>, Nanahira <78877@qq.com>",
   "dependencies": {
     "bunyan": "latest",
+    "deepmerge": "latest",
+    "load-json-file": "latest",
     "moment": "latest",
-    "nconf": "latest",
+    "redis": "latest",
+    "formidable": "latest",
     "request": "latest",
     "underscore": "latest",
-    "underscore.string": "latest"
+    "underscore.string": "latest",
+    "sqlite3": "latest",
+    "geoip-country-lite": "latest",
+    "challonge": "latest",
+    "pg": "^6.4.2",
+    "ws": "^6.0.0"
   },
   "license": "AGPL-3.0",
   "scripts": {
