@@ -1316,8 +1316,10 @@
     for (m = 0, len3 = ref3.length; m < len3; m++) {
       buffer = ref3[m];
       ++i;
-      ygopro.stoc_send_chat(client, "${replay_hint_part1}" + i + "${replay_hint_part2}", ygopro.constants.COLORS.BABYBLUE);
-      ygopro.stoc_send(client, "REPLAY", buffer);
+      if (buffer) {
+        ygopro.stoc_send_chat(client, "${replay_hint_part1}" + i + "${replay_hint_part2}", ygopro.constants.COLORS.BABYBLUE);
+        ygopro.stoc_send(client, "REPLAY", buffer);
+      }
     }
     return true;
   };
