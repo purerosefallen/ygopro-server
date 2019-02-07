@@ -77,6 +77,11 @@
       "enabled": false,
       "generate_count": 500
     },
+    "pre_release_compat": {
+      "enabled": false,
+      "official_database": "./ygopro/cards.cdb",
+      "pre_release_database": "./../ygopro-pre-data/expansions/pre-release.cdb"
+    },
     "random_duel": {
       "enabled": false,
       "no_rematch_check": false,
@@ -173,6 +178,10 @@
       "password": "123456",
       "port": 7933
     },
+    "side_restrict": {
+      "enabled": false,
+      "restrict_cards": []
+    },
     "test_mode": {
       "watch_public_hand": false,
       "no_connect_count_limit": false,
@@ -238,7 +247,7 @@
             "command": "bash",
             "args": [
               "-c",
-              "cd ocgcore ; git pull origin master ; cd ../script ; git pull origin master ; cd .. ; premake5 gmake ; cd build ; make config=release ; cd .. ; strip ygopro"
+              "cd ocgcore ; git pull origin master ; cd ../script ; git pull origin master ; cd .. ; ~/premake5 gmake ; cd build ; make config=release ; cd .. ; strip ygopro"
             ],
             "path": "./ygopro/"
           }
