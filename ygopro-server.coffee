@@ -44,6 +44,7 @@ import_datas = [
   "abuse_count",
   "ban_mc",
   "vip",
+  "is_using_pre_release",
   "vpass",
   "rag",
   "rid",
@@ -340,6 +341,9 @@ if settings.modules.windbot.enabled
 
 if settings.modules.heartbeat_detection.enabled
   long_resolve_cards = loadJSON('./data/long_resolve_cards.json')
+
+if settings.modules.pre_release_compat.enabled
+  sqlite3 = require('sqlite3').verbose()
 
 # 组件
 ygopro = require './ygopro.js'
@@ -1015,6 +1019,22 @@ SOCKET_flush_data = (sk, datas) ->
   datas.splice(0, datas.length)
   return true
 
+replace_buffer = (buffer, list, start_pos) ->
+  found = 0
+  len = buffer.length
+  if len < 4 + start_pos
+    return 0
+  for i in [start_pos...len - 3]
+    code = buffer.readInt32LE(i)
+    if list[code]
+      code = list[code]
+      buffer.writeInt32LE(code, i)
+      found++
+      i += 3
+      if i >= len - 4
+        break
+  return found
+
 class Room
   constructor: (name, @hostinfo) ->
     @name = name
@@ -1038,6 +1058,44 @@ class Room
     if settings.modules.replay_delay
       @replays = []
     ROOM_all.push this
+
+    if settings.modules.pre_release_compat.enabled
+      list_official_to_pre = {}
+      list_pre_to_official = {}
+      @list_official_to_pre = list_official_to_pre
+      @list_pre_to_official = list_pre_to_official
+      temp_list = {}
+      try
+        official_database = new sqlite3.Database(settings.modules.pre_release_compat.official_database)
+        pre_release_database = new sqlite3.Database(settings.modules.pre_release_compat.pre_release_database)
+        pre_release_database.each("select id,name from texts", (err, result) ->
+          if err
+            log.warn("Error loading pre-release database.", err)
+          else
+            temp_list[result.name] = result.id
+          return
+        , (err) ->
+          if err
+            log.warn("Error loaded pre-release database.", err)
+          else
+            official_database.each("select id,name from texts", (err, result) ->
+              if err
+                log.warn("Error loading official database.", err)
+              else if temp_list[result.name] and temp_list[result.name] != result.id
+                official_code = result.id
+                pre_release_code = temp_list[result.name]
+                list_official_to_pre[official_code] = pre_release_code
+                list_pre_to_official[pre_release_code] = official_code
+              return
+            , (err) ->
+              if err
+                log.warn("Error loaded official database.", err)
+              return
+            )
+          return
+        )
+      catch error
+        log.warn("Error loading databases", error)
 
     @hostinfo ||= JSON.parse(JSON.stringify(settings.hostinfo))
     delete @hostinfo.comment
@@ -1739,6 +1797,8 @@ ygopro.ctos_follow 'PLAYER_INFO', true, (buffer, info, client, server, datas)->
   client.name = name
   client.vpass = vpass
   client.name_vpass = if vpass then name + "$" + vpass else name
+  if settings.modules.pre_release_compat.enabled
+    client.is_using_pre_release = client.name_vpass == "COMPAT"
   #console.log client.name, client.vpass
   if settings.modules.vip.enabled and CLIENT_check_vip(client)
     client.vip = true
@@ -2366,6 +2426,8 @@ ygopro.stoc_follow 'GAME_MSG', true, (buffer, info, client, server, datas)->
   room=ROOM_all[client.rid]
   return unless room and !client.reconnecting
   msg = buffer.readInt8(0)
+  if settings.modules.pre_release_compat.enabled and client.is_using_pre_release
+    replace_buffer(buffer, room.list_official_to_pre, 1)
   if settings.modules.retry_handle.enabled
     if ygopro.constants.MSG[msg] == 'RETRY'
       if !client.retry_count?
@@ -3224,7 +3286,7 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
       client.side_interval = null
       client.side_tcount = null
   else
-    client.start_deckbuf = buffer
+    client.start_deckbuf = Buffer.from(buffer)
   oppo_pos = if room.hostinfo.mode == 2 then 2 else 1
   if settings.modules.http.quick_death_rule >= 2 and room.started and room.death and room.scores[room.dueling_players[0].name_vpass] != room.scores[room.dueling_players[oppo_pos].name_vpass]
     win_pos = if room.scores[room.dueling_players[0].name_vpass] > room.scores[room.dueling_players[oppo_pos].name_vpass] then 0 else oppo_pos
@@ -3237,13 +3299,22 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
     CLIENT_kick(room.dueling_players[oppo_pos - win_pos])
     CLIENT_kick(room.dueling_players[oppo_pos - win_pos + 1]) if room.hostinfo.mode == 2
     return true
+  if settings.modules.side_restrict.enabled and room.started
+    for code in settings.modules.side_restrict.restrict_cards
+      if _.indexOf(buff_side, code) > -1 or (settings.modules.pre_release_compat.enabled and _.indexOf(buff_side, room.list_pre_to_official[code]) > -1)
+        ygopro.stoc_send_chat_to_room(room, "${invalid_side_rule}", ygopro.constants.COLORS.RED)
+        ygopro.stoc_send client, 'ERROR_MSG', {
+          msg: 3
+          code: 0
+        }
+        return true
+  struct = ygopro.structs["deck"]
+  struct._setBuff(buffer)
   if room.random_type or room.arena
     if client.pos == 0
       room.waiting_for_player = room.waiting_for_player2
     room.last_active_time = moment()
   else if !room.started and settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.deck_check and fs.readdirSync(settings.modules.tournament_mode.deck_path).length
-    struct = ygopro.structs["deck"]
-    struct._setBuff(buffer)
     struct.set("mainc", 1)
     struct.set("sidec", 1)
     struct.set("deckbuf", [4392470, 4392470])
@@ -3277,14 +3348,49 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
       else
         #log.info("bad deck: " + client.name + " / " + buff_main + " / " + buff_side)
         ygopro.stoc_send_chat(client, "${deck_incorrect_part1} #{found_deck} ${deck_incorrect_part2}", ygopro.constants.COLORS.RED)
+        return false
     else
       #log.info("player deck not found: " + client.name)
       ygopro.stoc_send_chat(client, "#{client.name}${deck_not_found}", ygopro.constants.COLORS.RED)
+      return false
+
+  if settings.modules.pre_release_compat.enabled
+    found = false
+    buff_main_new = []
+    buff_side_new = []
+    for code in buff_main
+      code_ = code
+      if room.list_pre_to_official[code]
+        code_ = room.list_pre_to_official[code]
+        found = true
+      buff_main_new.push(code_)
+    for code in buff_side
+      code_ = code
+      if room.list_pre_to_official[code]
+        code_ = room.list_pre_to_official[code]
+        found = true
+      buff_side_new.push(code_)
+    if found
+      compat_deckbuf = buff_main_new.concat(buff_side_new)
+      struct.set("mainc", buff_main_new.length)
+      struct.set("sidec", buff_side_new.length)
+      struct.set("deckbuf", compat_deckbuf)
+      buffer = struct.buffer
+      client.main = buff_main_new
+      client.side = buff_side_new
+    if !room.started
+      client.is_using_pre_release = found or client.vpass == "COMPAT"
+      if client.is_using_pre_release
+        ygopro.stoc_send_chat(client, "${pre_release_compat_hint}", ygopro.constants.COLORS.BABYBLUE)
+
   return false
 
 ygopro.ctos_follow 'RESPONSE', false, (buffer, info, client, server, datas)->
   room=ROOM_all[client.rid]
-  return unless room and (room.random_type or room.arena)
+  return unless room
+  if settings.modules.pre_release_compat.enabled and client.is_using_pre_release
+    replace_buffer(buffer, room.list_pre_to_official, 0)
+  return unless room.random_type or room.arena
   room.last_active_time = moment()
   return
 
@@ -3464,8 +3570,9 @@ ygopro.stoc_follow 'REPLAY', true, (buffer, info, client, server, datas)->
   return settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.replay_safe and settings.modules.tournament_mode.block_replay_to_player or settings.modules.replay_delay unless room
   if settings.modules.cloud_replay.enabled and room.random_type
     Cloud_replay_ids.push room.cloud_replay_id
-  if settings.modules.replay_delay and room.hostinfo.mode == 1 and client.pos == 0 and not (settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.replay_safe and settings.modules.tournament_mode.block_replay_to_player)
-    room.replays.push(buffer)
+  if settings.modules.replay_delay and room.hostinfo.mode == 1 and not (settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.replay_safe and settings.modules.tournament_mode.block_replay_to_player)
+    # console.log("Replay saved: " + (room.duel_count - 1))
+    room.replays[room.duel_count - 1] = buffer
   if settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.replay_safe
     if client.pos == 0
       dueltime=moment().format('YYYY-MM-DD HH-mm-ss')
