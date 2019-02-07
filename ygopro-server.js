@@ -3018,12 +3018,15 @@
   ygopro.stoc_follow('GAME_MSG', true, function(buffer, info, client, server, datas) {
     var act_pos, card, chain, check, count, cpos, deck_found, found, hint_type, i, id, len10, len11, len3, len4, len5, len6, len7, len8, len9, limbo_found, line, loc, m, max_loop, msg, n, o, oppo_pos, p, phase, player, playertype, pos, ppos, q, r, r_player, reason, ref10, ref11, ref12, ref13, ref3, ref4, ref5, ref6, ref7, ref8, ref9, room, s, t, trigger_location, val, win_pos, x, y;
     room = ROOM_all[client.rid];
-    if (!(room && !client.reconnecting)) {
+    if (!room) {
       return;
     }
     msg = buffer.readInt8(0);
     if (settings.modules.pre_release_compat.enabled && client.is_using_pre_release) {
       replace_buffer(buffer, room.list_official_to_pre, 1);
+    }
+    if (!!client.reconnecting) {
+      return;
     }
     if (settings.modules.retry_handle.enabled) {
       if (ygopro.constants.MSG[msg] === 'RETRY') {
