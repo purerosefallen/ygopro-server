@@ -4608,7 +4608,7 @@
     if (settings.modules.cloud_replay.enabled && room.random_type) {
       Cloud_replay_ids.push(room.cloud_replay_id);
     }
-    if (settings.modules.replay_delay && room.hostinfo.mode === 1 && !(settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.replay_safe && settings.modules.tournament_mode.block_replay_to_player)) {
+    if (settings.modules.replay_delay && room.hostinfo.mode === 1 && !(settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.replay_safe && settings.modules.tournament_mode.block_replay_to_player) && !room.replays[room.duel_count - 1]) {
       room.replays[room.duel_count - 1] = buffer;
     }
     if (settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.replay_safe) {
