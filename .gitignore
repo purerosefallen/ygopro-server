@@ -23,7 +23,8 @@ ygopro-2pick
 /node_modules
 /ssl
 /ygosrv233
-/dash.json
+/challonge
+/logs
 
 test*
 *.heapsnapshot
