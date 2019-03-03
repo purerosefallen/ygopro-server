@@ -52,6 +52,7 @@ import_datas = [
   "retry_count",
   "name",
   "pass",
+  "name_vpass",
   "is_first",
   "lp",
   "card_count",
@@ -245,6 +246,8 @@ catch
   config = {}
 settings = global.settings = merge(default_config, config, { arrayMerge: (destination, source) -> source })
 
+auth = require './ygopro-auth.js'
+
 #import old configs
 imported = false
 #reset http.quick_death_rule from true to 1
@@ -255,6 +258,41 @@ if settings.modules.http.quick_death_rule == true
 if settings.modules.cloud_replay.redis_port
   settings.modules.cloud_replay.redis.port = settings.modules.cloud_replay.redis_port
   delete settings.modules.cloud_replay.redis_port
+  imported = true
+#import the old passwords to new admin user system
+if settings.modules.http.password
+  auth.add_user("olduser", settings.modules.http.password, true, {
+        "get_rooms": true,
+        "shout": true,
+        "stop": true,
+        "change_settings": true,
+        "ban_user": true,
+        "kick_user": true,
+        "start_death": true
+  })
+  delete settings.modules.http.password
+  imported = true
+if settings.modules.tournament_mode.password
+  auth.add_user("tournament", settings.modules.tournament_mode.password, true, {
+        "duel_log": true,
+        "download_replay": true,
+        "clear_duel_log": true,
+        "deck_dashboard_read": true,
+        "deck_dashboard_write": true,
+  })
+  delete settings.modules.tournament_mode.password
+  imported = true
+if settings.modules.pre_util.password
+  auth.add_user("pre", settings.modules.pre_util.password, true, {
+        "pre_dashboard": true
+  })
+  delete settings.modules.pre_util.password
+  imported = true
+if settings.modules.update_util.password
+  auth.add_user("update", settings.modules.update_util.password, true, {
+        "update_dashboard": true
+  })
+  delete settings.modules.update_util.password
   imported = true
 #finish
 if imported
@@ -377,7 +415,10 @@ if settings.modules.mycard.enabled
   pg_client.connect()
 
 if settings.modules.challonge.enabled
-  challonge = require('challonge').createClient({
+  challonge_module_name = 'challonge'
+  if settings.modules.challonge.use_custom_module
+    challonge_module_name = settings.modules.challonge.use_custom_module
+  challonge = require(challonge_module_name).createClient({
     apiKey: settings.modules.challonge.api_key
   })
   if settings.modules.challonge.cache_ttl
@@ -1299,13 +1340,14 @@ class Room
         return
 
     if settings.modules.challonge.enabled and @started and @hostinfo.mode != 2 and !@kicked
+      room_name = @name
       challonge.matches._update({
         id: settings.modules.challonge.tournament_id,
         matchId: @challonge_info.id,
         match: @get_challonge_score(),
         callback: (err, data) ->
           if err
-            log.warn("Errored pushing scores to Challonge.", err)
+            log.warn("Errored pushing scores to Challonge.", room_name, err)
           else
             refresh_challonge_cache()
           return
@@ -1461,11 +1503,12 @@ class Room
       client.server.destroy()
     else
       #log.info(client.name, @started, @disconnector, @random_type, @players.length)
-      if @arena and !@started
+      if @arena and !@started and @disconnector != 'server' and !@arena_score_handled
         for player in @players when player.pos != 7
           @scores[player.name_vpass] = 0
         if @players.length == 2
           @scores[client.name_vpass] = -9
+        @arena_score_handled = true
       index = _.indexOf(@players, client)
       @players.splice(index, 1) unless index == -1
       if @started and @disconnector != 'server' and client.pos < 4
@@ -2420,11 +2463,11 @@ if settings.modules.dialogues.get_custom
 
 ygopro.stoc_follow 'GAME_MSG', true, (buffer, info, client, server, datas)->
   room=ROOM_all[client.rid]
-  return unless room
-  msg = buffer.readInt8(0)
+  return false unless room
   if settings.modules.pre_release_compat.enabled and client.is_using_pre_release
     replace_buffer(buffer, room.list_official_to_pre, 1)
-  return unless !client.reconnecting
+  return false if client.reconnecting
+  msg = buffer.readInt8(0)
   if settings.modules.retry_handle.enabled
     if ygopro.constants.MSG[msg] == 'RETRY'
       if !client.retry_count?
@@ -3555,13 +3598,14 @@ ygopro.stoc_follow 'CHANGE_SIDE', false, (buffer, info, client, server, datas)->
   if settings.modules.challonge.enabled and settings.modules.challonge.post_score_midduel and room.hostinfo.mode != 2 and client.pos == 0
     temp_log = JSON.parse(JSON.stringify(room.get_challonge_score()))
     delete temp_log.winnerId
+    room_name = room.name
     challonge.matches._update({
       id: settings.modules.challonge.tournament_id,
       matchId: room.challonge_info.id,
       match: temp_log,
       callback: (err, data) ->
         if err
-          log.warn("Errored pushing scores to Challonge.", err)
+          log.warn("Errored pushing scores to Challonge.", room_name, err)
         else
           refresh_challonge_cache()
         return
@@ -3708,10 +3752,11 @@ if settings.modules.http
   requestListener = (request, response)->
     parseQueryString = true
     u = url.parse(request.url, parseQueryString)
-    pass_validated = u.query.pass == settings.modules.http.password
+    #pass_validated = u.query.pass == settings.modules.http.password
 
+    #console.log(u.query.username, u.query.pass)
     if u.pathname == '/api/getrooms'
-      if !pass_validated and !settings.modules.http.public_roomlist
+      if !settings.modules.http.public_roomlist and !auth.auth(u.query.username, u.query.pass, "get_rooms", "get_rooms")
         response.writeHead(200)
         response.end(addCallback(u.query.callback, '{"rooms":[{"roomid":"0","roomname":"密码错误","needpass":"true"}]}'))
       else
@@ -3737,7 +3782,7 @@ if settings.modules.http
         response.end(addCallback(u.query.callback, roomsjson))
 
     else if u.pathname == '/api/duellog' and settings.modules.tournament_mode.enabled
-      if !(u.query.pass == settings.modules.tournament_mode.password)
+      if !auth.auth(u.query.username, u.query.pass, "duel_log", "duel_log")
         response.writeHead(200)
         response.end(addCallback(u.query.callback, "[{name:'密码错误'}]"))
         return
@@ -3747,7 +3792,7 @@ if settings.modules.http
         response.end(addCallback(u.query.callback, duellog))
 
     else if u.pathname == '/api/getkeys' and settings.modules.vip.enabled
-      if !(u.query.pass == settings.modules.http.password)
+      if !auth.auth(u.query.username, u.query.pass, "vip", "get_keys")
         response.writeHead(200)
         response.end(addCallback(u.query.callback, "Unauthorized."))
         return
@@ -3763,7 +3808,7 @@ if settings.modules.http
         response.end(addCallback(u.query.callback, ret_keys))
 
     else if u.pathname == '/api/archive.zip' and settings.modules.tournament_mode.enabled
-      if !(u.query.pass == settings.modules.tournament_mode.password)
+      if !auth.auth(u.query.username, u.query.pass, "download_replay", "download_replay_archive")
         response.writeHead(403)
         response.end("Invalid password.")
         return
@@ -3806,7 +3851,7 @@ if settings.modules.http
           response.end("Failed reading replays. " + error)
 
     else if u.pathname == '/api/clearlog' and settings.modules.tournament_mode.enabled
-      if !(u.query.pass == settings.modules.tournament_mode.password)
+      if !auth.auth(u.query.username, u.query.pass, "clear_duel_log", "clear_duel_log")
         response.writeHead(200)
         response.end(addCallback(u.query.callback, "[{name:'密码错误'}]"))
         return
@@ -3822,7 +3867,7 @@ if settings.modules.http
         response.end(addCallback(u.query.callback, "[{name:'Success'}]"))
 
     else if _.startsWith(u.pathname, '/api/replay') and settings.modules.tournament_mode.enabled
-      if !(u.query.pass == settings.modules.tournament_mode.password)
+      if !auth.auth(u.query.username, u.query.pass, "download_replay", "download_replay")
         response.writeHead(403)
         response.end("密码错误")
         return
@@ -3840,18 +3885,26 @@ if settings.modules.http
         )
 
     else if u.pathname == '/api/message'
-      if !pass_validated
-        response.writeHead(200)
-        response.end(addCallback(u.query.callback, "['密码错误', 0]"))
-        return
+      #if !pass_validated
+      #  response.writeHead(200)
+      #  response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+      #  return
 
       if u.query.shout
+        if !auth.auth(u.query.username, u.query.pass, "shout", "shout")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         for room in ROOM_all when room and room.established
           ygopro.stoc_send_chat_to_room(room, u.query.shout, ygopro.constants.COLORS.YELLOW)
         response.writeHead(200)
         response.end(addCallback(u.query.callback, "['shout ok', '" + u.query.shout + "']"))
 
       else if u.query.stop
+        if !auth.auth(u.query.username, u.query.pass, "stop", "stop")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         if u.query.stop == 'false'
           u.query.stop = false
         setting_change(settings, 'modules:stop', u.query.stop)
@@ -3859,15 +3912,27 @@ if settings.modules.http
         response.end(addCallback(u.query.callback, "['stop ok', '" + u.query.stop + "']"))
 
       else if u.query.welcome
+        if !auth.auth(u.query.username, u.query.pass, "change_settings", "change_welcome")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         setting_change(settings, 'modules:welcome', u.query.welcome)
         response.writeHead(200)
         response.end(addCallback(u.query.callback, "['welcome ok', '" + u.query.welcome + "']"))
 
       else if u.query.getwelcome
+        if !auth.auth(u.query.username, u.query.pass, "change_settings", "get_welcome")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         response.writeHead(200)
         response.end(addCallback(u.query.callback, "['get ok', '" + settings.modules.welcome + "']"))
 
       else if u.query.loadtips
+        if !auth.auth(u.query.username, u.query.pass, "change_settings", "change_tips")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         load_tips()
         if settings.modules.tips.get_zh
           load_tips_zh()
@@ -3875,6 +3940,10 @@ if settings.modules.http
         response.end(addCallback(u.query.callback, "['loading tip', '" + settings.modules.tips.get + (if settings.modules.tips.get_zh then " and " + settings.modules.tips.get_zh else "") + "']"))
 
       else if u.query.loaddialogues
+        if !auth.auth(u.query.username, u.query.pass, "change_settings", "change_dialogues")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         load_dialogues()
         if settings.modules.dialogues.get_custom
           load_dialogues_custom()
@@ -3887,11 +3956,19 @@ if settings.modules.http
         response.end(addCallback(u.query.callback, "['loading words', '" + settings.modules.words.get + "']"))
 
       else if u.query.ban
+        if !auth.auth(u.query.username, u.query.pass, "ban_user", "ban_user")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         ban_user(u.query.ban)
         response.writeHead(200)
         response.end(addCallback(u.query.callback, "['ban ok', '" + u.query.ban + "']"))
 
       else if u.query.kick
+        if !auth.auth(u.query.username, u.query.pass, "kick_user", "kick_user")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         kick_room_found = false
         for room in ROOM_all when room and room.established and (u.query.kick == "all" or u.query.kick == room.process_pid.toString() or u.query.kick == room.name)
           kick_room_found = true
@@ -3909,6 +3986,10 @@ if settings.modules.http
           response.end(addCallback(u.query.callback, "['room not found', '" + u.query.kick + "']"))
 
       else if u.query.death
+        if !auth.auth(u.query.username, u.query.pass, "start_death", "start_death")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         death_room_found = false
         for room in ROOM_all when room and room.established and room.started and !room.death and (u.query.death == "all" or u.query.death == room.process_pid.toString() or u.query.death == room.name)
           death_room_found = true
@@ -3954,6 +4035,10 @@ if settings.modules.http
           response.end(addCallback(u.query.callback, "['room not found', '" + u.query.death + "']"))
 
       else if u.query.deathcancel
+        if !auth.auth(u.query.username, u.query.pass, "start_death", "cancel_death")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         death_room_found = false
         for room in ROOM_all when room and room.established and room.started and room.death and (u.query.deathcancel == "all" or u.query.deathcancel == room.process_pid.toString())
           death_room_found = true
@@ -3966,6 +4051,10 @@ if settings.modules.http
           response.end(addCallback(u.query.callback, "['room not found', '" + u.query.deathcancel + "']"))
 
       else if u.query.generatekey and settings.modules.vip.enabled
+        if !auth.auth(u.query.username, u.query.pass, "vip", "generate_keys")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
         VIP_generate_cdkeys(u.query.generatekey, settings.modules.vip.generate_count)
         response.writeHead(200)
         response.end(addCallback(u.query.callback, "['Keys generated', '" + u.query.generatekey + "']"))
@@ -3988,5 +4077,6 @@ if settings.modules.http
       cert: fs.readFileSync(settings.modules.http.ssl.cert)
       key: fs.readFileSync(settings.modules.http.ssl.key)
     https_server = https.createServer(options, requestListener)
-    roomlist.init https_server, ROOM_all
+    if settings.modules.http.websocket_roomlist and roomlist
+      roomlist.init https_server, ROOM_all
     https_server.listen settings.modules.http.ssl.port
