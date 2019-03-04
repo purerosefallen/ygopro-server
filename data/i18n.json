@@ -189,6 +189,7 @@
     "pre_release_compat_hint": "It seems like you're a duelist with pre-release cards. The pre-release compat mode is turned on.",
     "replay_hint_part1": "Sending the replay of the duel number ",
     "replay_hint_part2": ".",
+    "invalid_side_rule": "Illegal cards are contained in your side deck.",
     "athletic_arena_tip": "During an athletic match, a game quit behavior is regarded as a surrender."
   },
   "es-es": {
@@ -525,6 +526,7 @@
     "pre_release_compat_hint": "看起来你是使用先行卡数据的用户，已开启先行卡兼容模式。",
     "replay_hint_part1": "正在发送第",
     "replay_hint_part2": "局决斗的录像。",
+    "invalid_side_rule": "副卡组中包含不允许换入副卡组的卡。",
     "athletic_arena_tip": "在竞技匹配中，比赛开始前退出游戏也会视为投降。"
   },
  "ko-kr": {

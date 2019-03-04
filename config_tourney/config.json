@@ -128,7 +128,8 @@
       "post_score_midduel": true,
       "cache_ttl": 60000,
       "api_key": "11",
-      "tournament_id": "22"
+      "tournament_id": "22",
+      "use_custom_module": false
     },
     "deck_log": {
       "enabled": false,

@@ -17,6 +17,8 @@ var moment = require('moment');
 moment.locale('zh-cn');
 var loadJSON = require('load-json-file').sync;
 
+var auth = require('./ygopro-auth.js');
+
 var constants = loadJSON('./data/constants.json');
 
 var settings = loadJSON('./config/config.json');
@@ -406,7 +408,7 @@ var packDatas = function () {
 http.createServer(function (req, res) {
     var u = url.parse(req.url, true);
     
-    if (u.query.password !== config.password) {
+    if (!auth.auth(u.query.username, u.query.password, "pre_dashboard", "pre_dashboard")) {
         res.writeHead(403);
         res.end("Auth Failed.");
         return;
@@ -464,4 +466,3 @@ http.createServer(function (req, res) {
     }
 
 }).listen(config.port);
-
