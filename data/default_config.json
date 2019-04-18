@@ -22,6 +22,7 @@
     "side_timeout": false,
     "tag_duel_surrender": true,
     "replay_delay": false,
+    "hide_name": false,
     "i18n": {
       "auto_pick": false,
       "default": "zh-cn",
@@ -162,6 +163,7 @@
       "comment": "mode: athletic / entertain",
       "accesskey": "233",
       "ready_time": 30,
+      "check_permit": "https://api.mycard.moe/ygopro/match/permit",
       "post_score": false,
       "get_score": false
     },
