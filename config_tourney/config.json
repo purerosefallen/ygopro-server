@@ -1,6 +1,6 @@
 {
   "file": "./config/config.json",
-  "port": 1262,
+  "port": 514,
   "version": 4930,
   "hostinfo": {
     "lflist": 0,
@@ -67,6 +67,9 @@
     "words": {
       "enabled": false,
       "get": false
+    },
+    "koishi_roomlist": {
+      "enabled": false
     },
     "vip": {
       "enabled": false,
@@ -162,7 +165,7 @@
       "show_ip": true,
       "show_info": true,
       "log_save_path": "./config/",
-      "port": 1264
+      "port": 5142
     },
     "test_mode": {
       "watch_public_hand": false,
@@ -285,9 +288,9 @@
       ]
     },
     "http": {
-      "port": 1263,
+      "port": 5141,
       "websocket_roomlist": false,
-      "public_roomlist": true,
+      "public_roomlist": false,
       "show_ip": true,
       "show_info": true,
       "quick_death_rule": 2,

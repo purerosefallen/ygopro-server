@@ -508,6 +508,25 @@
     pg_client.on('drain', pg_client.end.bind(pg_client));
     log.info("loading mycard user...");
     pg_client.connect();
+    if (settings.modules.arena_mode.enabled && settings.modules.arena_mode.init_post.enabled) {
+      request.post({
+        url: settings.modules.arena_mode.init_post.url,
+        qs: {
+          ak: settings.modules.arena_mode.init_post.accesskey,
+          arena: settings.modules.arena_mode.mode
+        }
+      }, (function(_this) {
+        return function(error, response, body) {
+          if (error) {
+            log.warn('ARENA INIT POST ERROR', error);
+          } else {
+            if (response.statusCode >= 400) {
+              log.warn('ARENA INIT POST FAIL', response.statusCode, response.statusMessage, body);
+            }
+          }
+        };
+      })(this));
+    }
   }
 
   if (settings.modules.challonge.enabled) {
@@ -1409,7 +1428,7 @@
 
   Room = (function() {
     function Room(name, hostinfo) {
-      var draw_count, error, lflist, list_official_to_pre, list_pre_to_official, official_database, param, pre_release_database, rule, start_hand, start_lp, temp_list, time_limit;
+      var death_time, draw_count, error, lflist, list_official_to_pre, list_pre_to_official, official_database, param, pre_release_database, rule, start_hand, start_lp, temp_list, time_limit;
       this.hostinfo = hostinfo;
       this.name = name;
       this.alive = true;
@@ -1588,7 +1607,15 @@
           this.hostinfo.enable_priority = true;
         }
         if (rule.match(/(^|，|,)(NOWATCH|NW)(，|,|$)/)) {
-          this.no_watch = true;
+          this.hostinfo.no_watch = true;
+        }
+        if ((param = rule.match(/(^|，|,)(DEATH|DH)(\d*)(，|,|$)/))) {
+          death_time = parseInt(param[3]);
+          if (death_time && death_time > 0) {
+            this.hostinfo.auto_death = death_time;
+          } else {
+            this.hostinfo.auto_death = 40;
+          }
         }
       }
       this.hostinfo.replay_mode = settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.replay_safe || this.hostinfo.mode === 1 && settings.modules.replay_delay ? 1 : 0;
@@ -2007,6 +2034,73 @@
           client.server.destroy();
         }
       }
+    };
+
+    Room.prototype.start_death = function() {
+      var oppo_pos, win_pos;
+      if (!(this.established && this.started && !this.death)) {
+        return false;
+      }
+      oppo_pos = this.hostinfo.mode === 2 ? 2 : 1;
+      if (!this.changing_side && (!this.duel_count || this.turn)) {
+        switch (settings.modules.http.quick_death_rule) {
+          case 3:
+            this.death = -2;
+            ygopro.stoc_send_chat_to_room(this, "${death_start_phase}", ygopro.constants.COLORS.BABYBLUE);
+            break;
+          default:
+            this.death = (this.turn ? this.turn + 4 : 5);
+            ygopro.stoc_send_chat_to_room(this, "${death_start}", ygopro.constants.COLORS.BABYBLUE);
+        }
+      } else {
+        switch (settings.modules.http.quick_death_rule) {
+          case 2:
+          case 3:
+            if (this.scores[this.dueling_players[0].name_vpass] === this.scores[this.dueling_players[oppo_pos].name_vpass]) {
+              if (settings.modules.http.quick_death_rule === 3) {
+                this.death = -1;
+                ygopro.stoc_send_chat_to_room(this, "${death_start_quick}", ygopro.constants.COLORS.BABYBLUE);
+              } else {
+                this.death = 5;
+                ygopro.stoc_send_chat_to_room(this, "${death_start_siding}", ygopro.constants.COLORS.BABYBLUE);
+              }
+            } else {
+              win_pos = this.scores[this.dueling_players[0].name_vpass] > this.scores[this.dueling_players[oppo_pos].name_vpass] ? 0 : oppo_pos;
+              this.finished_by_death = true;
+              ygopro.stoc_send_chat_to_room(this, "${death2_finish_part1}" + this.dueling_players[win_pos].name + "${death2_finish_part2}", ygopro.constants.COLORS.BABYBLUE);
+              if (this.hostinfo.mode === 1) {
+                CLIENT_send_replays(this.dueling_players[oppo_pos - win_pos], this);
+              }
+              ygopro.stoc_send(this.dueling_players[oppo_pos - win_pos], 'DUEL_END');
+              if (this.hostinfo.mode === 2) {
+                ygopro.stoc_send(this.dueling_players[oppo_pos - win_pos + 1], 'DUEL_END');
+              }
+              this.scores[this.dueling_players[oppo_pos - win_pos].name_vpass] = -1;
+              CLIENT_kick(this.dueling_players[oppo_pos - win_pos]);
+              if (this.hostinfo.mode === 2) {
+                CLIENT_kick(this.dueling_players[oppo_pos - win_pos + 1]);
+              }
+            }
+            break;
+          case 1:
+            this.death = -1;
+            ygopro.stoc_send_chat_to_room(this, "${death_start_quick}", ygopro.constants.COLORS.BABYBLUE);
+            break;
+          default:
+            this.death = 5;
+            ygopro.stoc_send_chat_to_room(this, "${death_start_siding}", ygopro.constants.COLORS.BABYBLUE);
+        }
+      }
+      return true;
+    };
+
+    Room.prototype.cancel_death = function() {
+      if (!(this.established && this.started && this.death)) {
+        return false;
+      }
+      this.death = 0;
+      ygopro.stoc_send_chat_to_room(this, "${death_cancel}", ygopro.constants.COLORS.BABYBLUE);
+      return true;
     };
 
     return Room;
@@ -2560,7 +2654,9 @@
               no_shuffle_deck: !!(opt1 & 1),
               start_lp: opt2,
               start_hand: opt3 >> 4,
-              draw_count: opt3 & 0xF
+              draw_count: opt3 & 0xF,
+              no_watch: false,
+              auto_death: false
             };
             options.lflist = _.findIndex(lflists, function(list) {
               return ((options.rule === 1) === list.tcg) && list.date.isBefore();
@@ -2620,7 +2716,7 @@
         } else if (room.error) {
           ygopro.stoc_die(client, room.error);
         } else if (room.started) {
-          if (settings.modules.cloud_replay.enable_halfway_watch && !room.no_watch) {
+          if (settings.modules.cloud_replay.enable_halfway_watch && !room.hostinfo.no_watch) {
             client.setTimeout(300000);
             client.rid = _.indexOf(ROOM_all, room);
             client.is_post_watcher = true;
@@ -2648,7 +2744,7 @@
           } else {
             ygopro.stoc_die(client, "${watch_denied}");
           }
-        } else if (room.no_watch && room.players.length >= (room.hostinfo.mode === 2 ? 4 : 2)) {
+        } else if (room.hostinfo.no_watch && room.players.length >= (room.hostinfo.mode === 2 ? 4 : 2)) {
           ygopro.stoc_die(client, "${watch_denied_room}");
         } else {
           client.setTimeout(300000);
@@ -2710,7 +2806,8 @@
           json: true,
           qs: {
             username: client.name,
-            password: info.pass
+            password: info.pass,
+            arena: settings.modules.arena_mode.mode
           }
         }, function(error, response, body) {
           if (client.closed) {
@@ -2728,7 +2825,7 @@
       }
     } else if (settings.modules.challonge.enabled) {
       pre_room = ROOM_find_by_name(info.pass);
-      if (pre_room && pre_room.started && settings.modules.cloud_replay.enable_halfway_watch && !pre_room.no_watch) {
+      if (pre_room && pre_room.started && settings.modules.cloud_replay.enable_halfway_watch && !pre_room.hostinfo.no_watch) {
         room = pre_room;
         client.setTimeout(300000);
         client.rid = _.indexOf(ROOM_all, room);
@@ -2807,7 +2904,7 @@
                 } else if (room.error) {
                   ygopro.stoc_die(client, room.error);
                 } else if (room.started) {
-                  if (settings.modules.cloud_replay.enable_halfway_watch && !room.no_watch) {
+                  if (settings.modules.cloud_replay.enable_halfway_watch && !room.hostinfo.no_watch) {
                     client.rid = _.indexOf(ROOM_all, room);
                     client.is_post_watcher = true;
                     if (settings.modules.vip.enabled && client.vip && vip_info.players[client.name].words) {
@@ -2834,7 +2931,7 @@
                   } else {
                     ygopro.stoc_die(client, "${watch_denied}");
                   }
-                } else if (room.no_watch && room.players.length >= (room.hostinfo.mode === 2 ? 4 : 2)) {
+                } else if (room.hostinfo.no_watch && room.players.length >= (room.hostinfo.mode === 2 ? 4 : 2)) {
                   ygopro.stoc_die(client, "${watch_denied_room}");
                 } else {
                   ref8 = room.get_playing_player();
@@ -2897,7 +2994,7 @@
       } else if (room.error) {
         ygopro.stoc_die(client, room.error);
       } else if (room.started) {
-        if (settings.modules.cloud_replay.enable_halfway_watch && !room.no_watch) {
+        if (settings.modules.cloud_replay.enable_halfway_watch && !room.hostinfo.no_watch) {
           client.setTimeout(300000);
           client.rid = _.indexOf(ROOM_all, room);
           client.is_post_watcher = true;
@@ -2925,7 +3022,7 @@
         } else {
           ygopro.stoc_die(client, "${watch_denied}");
         }
-      } else if (room.no_watch && room.players.length >= (room.hostinfo.mode === 2 ? 4 : 2)) {
+      } else if (room.hostinfo.no_watch && room.players.length >= (room.hostinfo.mode === 2 ? 4 : 2)) {
         ygopro.stoc_die(client, "${watch_denied_room}");
       } else {
         client.setTimeout(300000);
@@ -3009,7 +3106,7 @@
       });
       recorder.on('error', function(error) {});
     }
-    if (settings.modules.cloud_replay.enable_halfway_watch && !room.watcher && !room.no_watch) {
+    if (settings.modules.cloud_replay.enable_halfway_watch && !room.watcher && !room.hostinfo.no_watch) {
       room.watcher = watcher = settings.modules.test_mode.watch_public_hand ? room.recorder : net.connect(room.port, function() {
         ygopro.ctos_send(watcher, 'PLAYER_INFO', {
           name: "the Big Brother"
@@ -3160,7 +3257,7 @@
       room.selecting_tp = false;
       if (client.pos === 0) {
         room.turn = 0;
-        room.duel_count = room.duel_count + 1;
+        room.duel_count++;
         if (room.death && room.duel_count > 1) {
           if (room.death === -1) {
             ygopro.stoc_send_chat_to_room(room, "${death_start_final}", ygopro.constants.COLORS.BABYBLUE);
@@ -3468,7 +3565,7 @@
     if (!room) {
       return;
     }
-    if (room.no_watch || settings.modules.windbot.doom_bots) {
+    if (room.hostinfo.no_watch || settings.modules.windbot.doom_bots) {
       ygopro.stoc_send_chat(client, "${watch_denied_room}", ygopro.constants.COLORS.RED);
       return true;
     }
@@ -3826,6 +3923,9 @@
         if (room.random_type === 'T') {
           ROOM_players_oppentlist[player.ip] = null;
         }
+      }
+      if (room.hostinfo.auto_death) {
+        ygopro.stoc_send_chat_to_room(room, "${auto_death_part1}" + room.hostinfo.auto_death + "${auto_death_part2}", ygopro.constants.COLORS.BABYBLUE);
       }
     }
     if (settings.modules.hide_name && room.duel_count === 0) {
@@ -4885,6 +4985,21 @@
     }, settings.modules.heartbeat_detection.interval);
   }
 
+  setInterval(function() {
+    var current_time, len3, m, results, room;
+    current_time = moment();
+    results = [];
+    for (m = 0, len3 = ROOM_all.length; m < len3; m++) {
+      room = ROOM_all[m];
+      if (!(room && room.started && room.hostinfo.auto_death && !room.auto_death_triggered && current_time - moment(room.start_time) > 60000 * room.hostinfo.auto_death)) {
+        continue;
+      }
+      room.auto_death_triggered = true;
+      results.push(room.start_death());
+    }
+    return results;
+  }, 1000);
+
   windbot_looplimit = 0;
 
   spawn_windbot = function() {
@@ -4937,7 +5052,7 @@
       return callback + "( " + text + " );";
     };
     requestListener = function(request, response) {
-      var archive_args, archive_name, archive_process, check, death_room_found, duellog, error, filename, getpath, key, kick_room_found, len3, len4, len5, len6, len7, len8, m, n, o, oppo_pos, p, parseQueryString, pass_validated, player, q, r, ref3, ref4, replay, ret_keys, room, roomsjson, u, win_pos;
+      var archive_args, archive_name, archive_process, check, death_room_found, duellog, error, filename, getpath, key, kick_room_found, len3, len4, len5, len6, len7, len8, m, n, o, p, parseQueryString, pass_validated, player, q, r, ref3, ref4, replay, ret_keys, room, roomsjson, u;
       parseQueryString = true;
       u = url.parse(request.url, parseQueryString);
       if (u.pathname === '/api/getrooms') {
@@ -5240,58 +5355,9 @@
           death_room_found = false;
           for (q = 0, len7 = ROOM_all.length; q < len7; q++) {
             room = ROOM_all[q];
-            if (!(room && room.established && room.started && !room.death && (u.query.death === "all" || u.query.death === room.process_pid.toString() || u.query.death === room.name))) {
-              continue;
-            }
-            death_room_found = true;
-            oppo_pos = room.hostinfo.mode === 2 ? 2 : 1;
-            if (!room.changing_side && (!room.duel_count || room.turn)) {
-              switch (settings.modules.http.quick_death_rule) {
-                case 3:
-                  room.death = -2;
-                  ygopro.stoc_send_chat_to_room(room, "${death_start_phase}", ygopro.constants.COLORS.BABYBLUE);
-                  break;
-                default:
-                  room.death = (room.turn ? room.turn + 4 : 5);
-                  ygopro.stoc_send_chat_to_room(room, "${death_start}", ygopro.constants.COLORS.BABYBLUE);
-              }
-            } else {
-              switch (settings.modules.http.quick_death_rule) {
-                case 2:
-                case 3:
-                  if (room.scores[room.dueling_players[0].name_vpass] === room.scores[room.dueling_players[oppo_pos].name_vpass]) {
-                    if (settings.modules.http.quick_death_rule === 3) {
-                      room.death = -1;
-                      ygopro.stoc_send_chat_to_room(room, "${death_start_quick}", ygopro.constants.COLORS.BABYBLUE);
-                    } else {
-                      room.death = 5;
-                      ygopro.stoc_send_chat_to_room(room, "${death_start_siding}", ygopro.constants.COLORS.BABYBLUE);
-                    }
-                  } else {
-                    win_pos = room.scores[room.dueling_players[0].name_vpass] > room.scores[room.dueling_players[oppo_pos].name_vpass] ? 0 : oppo_pos;
-                    room.finished_by_death = true;
-                    ygopro.stoc_send_chat_to_room(room, "${death2_finish_part1}" + room.dueling_players[win_pos].name + "${death2_finish_part2}", ygopro.constants.COLORS.BABYBLUE);
-                    if (room.hostinfo.mode === 1) {
-                      CLIENT_send_replays(room.dueling_players[oppo_pos - win_pos], room);
-                    }
-                    ygopro.stoc_send(room.dueling_players[oppo_pos - win_pos], 'DUEL_END');
-                    if (room.hostinfo.mode === 2) {
-                      ygopro.stoc_send(room.dueling_players[oppo_pos - win_pos + 1], 'DUEL_END');
-                    }
-                    room.scores[room.dueling_players[oppo_pos - win_pos].name_vpass] = -1;
-                    CLIENT_kick(room.dueling_players[oppo_pos - win_pos]);
-                    if (room.hostinfo.mode === 2) {
-                      CLIENT_kick(room.dueling_players[oppo_pos - win_pos + 1]);
-                    }
-                  }
-                  break;
-                case 1:
-                  room.death = -1;
-                  ygopro.stoc_send_chat_to_room(room, "${death_start_quick}", ygopro.constants.COLORS.BABYBLUE);
-                  break;
-                default:
-                  room.death = 5;
-                  ygopro.stoc_send_chat_to_room(room, "${death_start_siding}", ygopro.constants.COLORS.BABYBLUE);
+            if (room && (u.query.death === "all" || u.query.death === room.process_pid.toString() || u.query.death === room.name)) {
+              if (room.start_death()) {
+                death_room_found = true;
               }
             }
           }
@@ -5310,12 +5376,11 @@
           death_room_found = false;
           for (r = 0, len8 = ROOM_all.length; r < len8; r++) {
             room = ROOM_all[r];
-            if (!(room && room.established && room.started && room.death && (u.query.deathcancel === "all" || u.query.deathcancel === room.process_pid.toString()))) {
-              continue;
+            if (room && (u.query.death === "all" || u.query.death === room.process_pid.toString() || u.query.death === room.name)) {
+              if (room.cancel_death()) {
+                death_room_found = true;
+              }
             }
-            death_room_found = true;
-            room.death = 0;
-            ygopro.stoc_send_chat_to_room(room, "${death_cancel}", ygopro.constants.COLORS.BABYBLUE);
           }
           response.writeHead(200);
           if (death_room_found) {
