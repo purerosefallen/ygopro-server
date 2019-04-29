@@ -1618,7 +1618,13 @@
           }
         }
       }
-      this.hostinfo.replay_mode = settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.replay_safe || this.hostinfo.mode === 1 && settings.modules.replay_delay ? 1 : 0;
+      this.hostinfo.replay_mode = 0;
+      if (settings.modules.tournament_mode.enabled) {
+        this.hostinfo.replay_mode |= 0x1;
+      }
+      if ((settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.replay_safe) || (this.hostinfo.mode === 1 && settings.modules.replay_delay)) {
+        this.hostinfo.replay_mode |= 0x2;
+      }
       param = [0, this.hostinfo.lflist, this.hostinfo.rule, this.hostinfo.mode, (this.hostinfo.enable_priority ? 'T' : 'F'), (this.hostinfo.no_check_deck ? 'T' : 'F'), (this.hostinfo.no_shuffle_deck ? 'T' : 'F'), this.hostinfo.start_lp, this.hostinfo.start_hand, this.hostinfo.draw_count, this.hostinfo.time_limit, this.hostinfo.replay_mode];
       try {
         this.process = spawn('./ygopro', param, {
