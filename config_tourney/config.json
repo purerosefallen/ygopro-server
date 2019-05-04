@@ -254,7 +254,7 @@
           "callback": {
             "command": "npm",
             "args": [
-              "install"
+              "ci"
             ],
             "path": "."
           }
