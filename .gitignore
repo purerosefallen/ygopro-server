@@ -12,7 +12,6 @@ config.*.json
 /decks_save*
 /node_modules/
 /ssl
-/package-lock.json
 
 test*
 *.heapsnapshot
