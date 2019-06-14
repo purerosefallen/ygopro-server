@@ -29,7 +29,7 @@ RUN npm ci && \
     cp config.json config.user.json
 
 # ygopro
-RUN git clone --branch=server_mr3 --recursive https://github.com/moecube/ygopro /ygopro-server/ygopro
+RUN git clone --branch=server_mr3 --recursive https://github.com/purerosefallen/ygopro /ygopro-server/ygopro
 WORKDIR /ygopro-server/ygopro
 RUN git submodule foreach git checkout master && \
     wget -O - https://github.com/premake/premake-core/releases/download/v5.0.0-alpha12/premake-5.0.0-alpha12-linux.tar.gz | tar zfx - && \
@@ -42,7 +42,7 @@ RUN git submodule foreach git checkout master && \
     mkdir replay expansions
 
 # windbot
-RUN git clone --branch=mr3 https://github.com/moecube/windbot /ygopro-server/windbot
+RUN git clone --branch=mr3 https://github.com/purerosefallen/windbot /ygopro-server/windbot
 WORKDIR /ygopro-server/windbot
 RUN xbuild /property:Configuration=Release /property:TargetFrameworkVersion="v4.5" && \
     ln -s ./bin/Release/WindBot.exe . && \
@@ -53,7 +53,7 @@ WORKDIR /
 RUN mkdir /redis
 EXPOSE 7911
 EXPOSE 7922
-VOLUME /ygopro-server/config
+# VOLUME /ygopro-server/config
 VOLUME /ygopro-server/ygopro/expansions
 
 CMD [ "pm2-docker", "start", "/ygopro-server/data/pm2-docker.json" ]
