@@ -1532,10 +1532,13 @@ class Room
     else
       #log.info(client.name, @started, @disconnector, @random_type, @players.length)
       if @arena and !@started and @disconnector != 'server' and !@arena_score_handled
-        for player in @players when player.pos != 7
-          @scores[player.name_vpass] = 0
-        if @players.length == 2 and !client.arena_quit_free
+        if settings.modules.arena_mode.punish_quit_before_match and @players.length == 2 and !client.arena_quit_free
+          for player in @players when player.pos != 7
+            @scores[player.name_vpass] = 0
           @scores[client.name_vpass] = -9
+        else
+          for player in @players when player.pos != 7
+            @scores[player.name_vpass] = -5
         @arena_score_handled = true
       index = _.indexOf(@players, client)
       @players.splice(index, 1) unless index == -1
@@ -2683,6 +2686,9 @@ ygopro.stoc_follow 'GAME_MSG', true, (buffer, info, client, server, datas)->
       room.winner_name = room.dueling_players[pos].name_vpass
       #log.info room.dueling_players, pos
       room.scores[room.winner_name] = room.scores[room.winner_name] + 1
+      if room.match_kill
+        room.match_kill = false
+        room.scores[room.winner_name] = 99
       if settings.modules.vip.enabled and room.dueling_players[pos].vip and vip_info.players[room.dueling_players[pos].name].victory
         for line in _.lines vip_info.players[room.dueling_players[pos].name].victory
           ygopro.stoc_send_chat_to_room(room, line, ygopro.constants.COLORS.PINK)
@@ -2694,6 +2700,9 @@ ygopro.stoc_follow 'GAME_MSG', true, (buffer, info, client, server, datas)->
         room.death = -1
       else
         room.death = 5
+
+  if ygopro.constants.MSG[msg] == 'MATCH_KILL' and client.pos == 0
+    room.match_kill = true
 
   #lp跟踪
   if ygopro.constants.MSG[msg] == 'DAMAGE' and client.pos == 0
@@ -3818,15 +3827,16 @@ if settings.modules.mycard.enabled
         CLIENT_kick(room.waiting_for_player)
       else if time_passed >= (settings.modules.random_duel.hang_timeout - 20) and not (time_passed % 10)
         ygopro.stoc_send_chat_to_room(room, "#{room.waiting_for_player.name} ${afk_warn_part1}#{settings.modules.random_duel.hang_timeout - time_passed}${afk_warn_part2}", ygopro.constants.COLORS.RED)
-    for room in ROOM_all when room and room.arena and !room.started and room.get_playing_player().length < 2
-      player = room.get_playing_player()[0]
-      if player and player.join_time and !player.arena_quit_free
-        waited_time = moment() - player.join_time
-        if waited_time >= 30000
-          ygopro.stoc_send_chat(player, "${arena_wait_timeout}", ygopro.constants.COLORS.BABYBLUE)
-          player.arena_quit_free = true
-        else if waited_time >= 5000 and waited_time < 6000
-          ygopro.stoc_send_chat(player, "${arena_wait_hint}", ygopro.constants.COLORS.BABYBLUE)
+    if settings.modules.arena_mode.punish_quit_before_match
+      for room in ROOM_all when room and room.arena and !room.started and room.get_playing_player().length < 2
+        player = room.get_playing_player()[0]
+        if player and player.join_time and !player.arena_quit_free
+          waited_time = moment() - player.join_time
+          if waited_time >= 30000
+            ygopro.stoc_send_chat(player, "${arena_wait_timeout}", ygopro.constants.COLORS.BABYBLUE)
+            player.arena_quit_free = true
+          else if waited_time >= 5000 and waited_time < 6000
+            ygopro.stoc_send_chat(player, "${arena_wait_hint}", ygopro.constants.COLORS.BABYBLUE)
     return
   , 1000
 
@@ -3848,6 +3858,7 @@ setInterval ()->
 
 # spawn windbot
 windbot_looplimit = 0
+windbot_process = null
 
 spawn_windbot = () ->
   if /^win/.test(process.platform)
@@ -3861,13 +3872,13 @@ spawn_windbot = () ->
   windbot_process = spawn windbot_bin, windbot_parameters, {cwd: 'windbot'}
   windbot_process.on 'error', (err)->
     log.warn 'WindBot ERROR', err
-    if windbot_looplimit < 1000
+    if windbot_looplimit < 1000 and !rebooted
       windbot_looplimit++
       spawn_windbot()
     return
   windbot_process.on 'exit', (code)->
     log.warn 'WindBot EXIT', code
-    if windbot_looplimit < 1000
+    if windbot_looplimit < 1000 and !rebooted
       windbot_looplimit++
       spawn_windbot()
     return
@@ -3884,6 +3895,7 @@ spawn_windbot = () ->
 if settings.modules.windbot.enabled and settings.modules.windbot.spawn
   spawn_windbot()
 
+rebooted = false
 #http
 if settings.modules.http
 
@@ -4157,6 +4169,26 @@ if settings.modules.http
           response.end(addCallback(u.query.callback, "['death cancel ok', '" + u.query.deathcancel + "']"))
         else
           response.end(addCallback(u.query.callback, "['room not found', '" + u.query.deathcancel + "']"))
+
+      else if u.query.reboot
+        if !auth.auth(u.query.username, u.query.pass, "stop", "reboot")
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['密码错误', 0]"))
+          return
+        for room in ROOM_all when room
+          if room.started
+            room.scores[room.dueling_players[0].name_vpass] = 0
+            room.scores[room.dueling_players[1].name_vpass] = 0
+          room.kicked = true
+          room.send_replays()
+          room.process.kill()
+          room.delete()
+        rebooted = true
+        if windbot_process
+          windbot_process.kill()
+        response.writeHead(200)
+        response.end(addCallback(u.query.callback, "['reboot ok', '" + u.query.reboot + "']"))
+        throw "rebooted"
 
       else if u.query.generatekey and settings.modules.vip.enabled
         if !auth.auth(u.query.username, u.query.pass, "vip", "generate_keys")
