@@ -22,7 +22,7 @@ bunyan = require 'bunyan'
 log = bunyan.createLogger name: "mycard"
 
 moment = require 'moment'
-moment.locale('zh-cn', {
+moment.updateLocale('zh-cn', {
   relativeTime: {
     future: '%s内',
     past: '%s前',
@@ -378,6 +378,14 @@ if settings.modules.cloud_replay.enabled
 
 if settings.modules.windbot.enabled
   windbots = loadJSON(settings.modules.windbot.botlist).windbots
+  real_windbot_server_ip = settings.modules.windbot.server_ip
+  if !settings.modules.windbot.server_ip.includes("127.0.0.1")
+    dns = require('dns')
+    dns.lookup(settings.modules.windbot.server_ip,(err,addr) ->
+      if(!err)
+        real_windbot_server_ip = addr
+    )
+
 
 if settings.modules.heartbeat_detection.enabled
   long_resolve_cards = loadJSON('./data/long_resolve_cards.json')
@@ -664,7 +672,7 @@ ROOM_find_or_create_random = (type, player_ip)->
   max_player = if type == 'T' then 4 else 2
   playerbanned = (bannedplayer and bannedplayer.count > 3 and moment() < bannedplayer.time)
   result = _.find ROOM_all, (room)->
-    return room and room.random_type != '' and !room.started and
+    return room and room.random_type != '' and !room.started and !room.windbot and
     ((type == '' and (room.random_type == 'S' or (settings.modules.random_duel.blank_pass_match and room.random_type != 'T'))) or room.random_type == type) and
     room.get_playing_player().length < max_player and
     (settings.modules.random_duel.no_rematch_check or room.get_host() == null or
@@ -1614,7 +1622,7 @@ class Room
 # 网络连接
 net.createServer (client) ->
   client.ip = client.remoteAddress
-  client.is_local = client.ip and (client.ip.includes('127.0.0.1') or client.ip.includes(settings.modules.windbot.server_ip))
+  client.is_local = client.ip and (client.ip.includes('127.0.0.1') or client.ip.includes(real_windbot_server_ip))
 
   connect_count = ROOM_connected_ip[client.ip] or 0
   if !settings.modules.test_mode.no_connect_count_limit and !client.is_local
@@ -3218,6 +3226,8 @@ ygopro.ctos_follow 'CHAT', true, (buffer, info, client, server, datas)->
             return
         else
           windbot = _.sample windbots
+        if room.random_type
+          ygopro.stoc_send_chat(client, "${windbot_disable_random_room} " + room.name, ygopro.constants.COLORS.BABYBLUE)
         room.add_windbot(windbot)
 
     when '/roomname'
@@ -3354,7 +3364,7 @@ ygopro.ctos_follow 'CHAT', true, (buffer, info, client, server, datas)->
     return cancel
   if client.abuse_count>=5 or CLIENT_is_banned_by_mc(client)
     log.warn "BANNED CHAT", client.name, client.ip, msg
-    ygopro.stoc_send_chat(client, "${banned_chat_tip}", ygopro.constants.COLORS.RED)
+    ygopro.stoc_send_chat(client, "${banned_chat_tip}" + (if client.ban_mc and client.ban_mc.message then (": " + client.ban_mc.message) else ""), ygopro.constants.COLORS.RED)
     return true
   oldmsg = msg
   if (_.any(badwords.level3, (badword) ->
@@ -4028,7 +4038,7 @@ if settings.modules.http
         return
       else
         getpath=u.pathname.split("/")
-        filename=decodeURIComponent(getpath.pop())
+        filename=path.basename(decodeURIComponent(getpath.pop()))
         fs.readFile(settings.modules.tournament_mode.replay_path + filename, (error, buffer)->
           if error
             response.writeHead(404)

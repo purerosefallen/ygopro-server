@@ -27,7 +27,7 @@ or as follows, to use a specific set of permissions.
 fs = require 'fs'
 loadJSON = require('load-json-file').sync
 moment = require 'moment'
-moment.locale('zh-cn', {
+moment.updateLocale('zh-cn', {
   relativeTime: {
     future: '%s内',
     past: '%s前',
@@ -45,13 +45,16 @@ moment.locale('zh-cn', {
   }
 })
 
+bunyan = require 'bunyan'
+log = bunyan.createLogger name: "auth"
+
 if not fs.existsSync('./logs')
   fs.mkdirSync('./logs')
 
 add_log = (message) ->
   mt = moment()
+  log.info(message)
   text = mt.format('YYYY-MM-DD HH:mm:ss') + " --> " + message + "\n"
-  console.log(text)
   res = false
   try
     fs.appendFileSync("./logs/"+mt.format('YYYY-MM-DD')+".log", text)

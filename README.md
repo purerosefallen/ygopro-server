@@ -35,11 +35,23 @@
   * 安装修改后的YGOPro服务端：https://github.com/moecube/ygopro/tree/server
 * `node ygopro-server.js`即可运行
 * 简易的控制台在 http://srvpro.ygo233.com/dashboard.html 或 http://srvpro-cn.ygo233.com/dashboard.html
-* 使用本项目的Docker镜像: https://hub.docker.com/r/mycard/ygopro-server/
-  * `7911`: YGOPro端口
-  * `7922`: 管理后台端口
-  * `/ygopro-server/config`: SRVPro配置文件数据卷
-  * `/ygopro-server/ygopro/expansions`: YGOPro额外卡片数据卷
+* 使用本项目的Docker镜像: https://hub.docker.com/r/nanahira/ygopro-server/
+
+  * 镜像标签
+    * `nanahira/ygopro-server:latest`: 完整镜像
+    * `nanahira/ygopro-server:lite`: 基本镜像，云录像和人机对战功能需要配合`redis`和`nanahira/windbot`这两个镜像使用。
+
+  * 端口
+    * `7911`: YGOPro端口
+    * `7922`: 管理后台端口
+
+  * 数据卷
+    * `/ygopro-server/config`: SRVPro配置文件数据卷
+    * `/ygopro-server/ygopro/expansions`: YGOPro额外卡片数据卷
+    * `/ygopro-server/decks`: 竞赛模式卡组数据卷
+    * `/ygopro-server/replays`: 竞赛模式录像数据卷
+
+  * 若使用竞赛模式启动服务器，建议把启动命令修改为`pm2-docker start /ygopro-server/data/pm2-docker-tournament.js`。
 
 ### 高级功能
 * 待补充说明

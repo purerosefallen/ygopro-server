@@ -10,6 +10,7 @@
  
 */
 var http = require('http');
+var https = require('https');
 var fs = require('fs');
 var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
@@ -19,10 +20,11 @@ var moment = require('moment');
 moment.locale('zh-cn');
 var loadJSON = require('load-json-file').sync;
 
-var constants = loadJSON('./data/constants.json');
+//var constants = loadJSON('./data/constants.json');
 
 var settings = loadJSON('./config/config.json');
-config=settings.modules.webhook;
+config = settings.modules.webhook;
+ssl_config = settings.modules.http.ssl;
 
 var status = {};
 
@@ -174,8 +176,7 @@ var return_success = function(res, msg) {
 	return;
 }
 
-//will create an http server to receive apis
-http.createServer(function (req, res) {
+var requestListener = function (req, res) {
 	var u = url.parse(req.url, true);
 	var data = u.pathname.split("/");
 	if (data[0] !== "" || data[1] !== "api") {
@@ -219,5 +220,17 @@ http.createServer(function (req, res) {
 		}
 	});
 	return;
-}).listen(config.port);
+}
 
+//will create an http server to receive apis
+if (ssl_config.enabled) {
+    const ssl_cert = fs.readFileSync(ssl_config.cert);
+    const ssl_key = fs.readFileSync(ssl_config.key);
+    const options = {
+        cert: ssl_cert,
+        key: ssl_key
+    }
+    https.createServer(options, requestListener).listen(config.port);
+} else { 
+    http.createServer(requestListener).listen(config.port);
+}
