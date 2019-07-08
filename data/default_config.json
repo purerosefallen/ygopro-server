@@ -86,7 +86,7 @@
       "pre_release_database": "./../ygopro-pre-data/expansions/pre-release.cdb"
     },
     "random_duel": {
-      "enabled": false,
+      "enabled": true,
       "no_rematch_check": false,
       "record_match_scores": false,
       "post_match_scores": false,
