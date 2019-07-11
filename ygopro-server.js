@@ -1703,7 +1703,7 @@
     }
 
     Room.prototype["delete"] = function() {
-      var end_time, index, log_rep_id, name, player_ips, player_names, recorder_buffer, ref3, replay_id, room_name, score, score_array, score_form;
+      var end_time, formatted_replays, index, len3, log_rep_id, m, name, player_ips, player_names, recorder_buffer, ref3, ref4, repbuf, replay_id, room_name, score, score_array, score_form;
       if (this.deleted) {
         return;
       }
@@ -1762,6 +1762,14 @@
           score_array[0].score = -5;
           score_array[1].score = -5;
         }
+        formatted_replays = [];
+        ref4 = this.replays;
+        for (m = 0, len3 = ref4.length; m < len3; m++) {
+          repbuf = ref4[m];
+          if (repbuf) {
+            formatted_replays.push(repbuf.toString("base64"));
+          }
+        }
         request.post({
           url: settings.modules.arena_mode.post_score,
           form: {
@@ -1772,7 +1780,7 @@
             userscoreB: score_array[1].score,
             userdeckA: score_array[0].deck,
             userdeckB: score_array[1].deck,
-            replays: this.replays,
+            replays: formatted_replays,
             start: this.start_time,
             end: end_time,
             arena: this.arena
