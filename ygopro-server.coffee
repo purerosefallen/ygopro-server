@@ -1069,7 +1069,7 @@ CLIENT_get_partner = (client) ->
     return room.dueling_players[5 - client.pos]
 
 CLIENT_send_replays = (client, room) ->
-  return false unless settings.modules.replay_delay and room.replays.length and room.hostinfo.mode == 1 and !client.replays_sent and !client.closed
+  return false unless settings.modules.replay_delay and not (settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.replay_safe and settings.modules.tournament_mode.block_replay_to_player) and room.replays.length and room.hostinfo.mode == 1 and !client.replays_sent and !client.closed
   client.replays_sent = true
   i = 0
   for buffer in room.replays
@@ -1124,8 +1124,7 @@ class Room
     @death = 0
     @turn = 0
     @duel_stage = ygopro.constants.DUEL_STAGE.BEGIN
-    if settings.modules.replay_delay
-      @replays = []
+    @replays = []
     ROOM_all.push this
 
     if settings.modules.pre_release_compat.enabled
@@ -1365,6 +1364,7 @@ class Room
         userscoreB: score_array[1].score,
         userdeckA: score_array[0].deck,
         userdeckB: score_array[1].deck,
+        replays: @replays,
         start: @start_time,
         end: end_time,
         arena: @arena
@@ -3771,7 +3771,7 @@ ygopro.stoc_follow 'REPLAY', true, (buffer, info, client, server, datas)->
   return settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.replay_safe and settings.modules.tournament_mode.block_replay_to_player or settings.modules.replay_delay unless room
   if settings.modules.cloud_replay.enabled and room.random_type
     Cloud_replay_ids.push room.cloud_replay_id
-  if settings.modules.replay_delay and room.hostinfo.mode == 1 and not (settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.replay_safe and settings.modules.tournament_mode.block_replay_to_player) and !room.replays[room.duel_count - 1]
+  if !room.replays[room.duel_count - 1]
     # console.log("Replay saved: ", room.duel_count - 1, client.pos)
     room.replays[room.duel_count - 1] = buffer
   if settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.replay_safe
