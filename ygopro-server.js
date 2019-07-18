@@ -349,6 +349,16 @@
     imported = true;
   }
 
+  if (settings.hostinfo.enable_priority || settings.hostinfo.enable_priority === false) {
+    if (settings.hostinfo.enable_priority) {
+      settings.hostinfo.duel_rule = 3;
+    } else {
+      settings.hostinfo.duel_rule = 4;
+    }
+    delete settings.hostinfo.enable_priority;
+    imported = true;
+  }
+
   if (imported) {
     setting_save(settings);
   }
@@ -1440,7 +1450,7 @@
 
   Room = (function() {
     function Room(name, hostinfo) {
-      var death_time, draw_count, error, lflist, list_official_to_pre, list_pre_to_official, official_database, param, pre_release_database, rule, start_hand, start_lp, temp_list, time_limit;
+      var death_time, draw_count, duel_rule, error, lflist, list_official_to_pre, list_pre_to_official, official_database, param, pre_release_database, rule, start_hand, start_lp, temp_list, time_limit;
       this.hostinfo = hostinfo;
       this.name = name;
       this.players = [];
@@ -1526,7 +1536,7 @@
       } else if ((param = name.match(/^(\d)(\d)(T|F)(T|F)(T|F)(\d+),(\d+),(\d+)/i))) {
         this.hostinfo.rule = parseInt(param[1]);
         this.hostinfo.mode = parseInt(param[2]);
-        this.hostinfo.enable_priority = param[3] === 'T';
+        this.hostinfo.duel_rule = (param[3] === 'T' ? 3 : 4);
         this.hostinfo.no_check_deck = param[4] === 'T';
         this.hostinfo.no_shuffle_deck = param[5] === 'T';
         this.hostinfo.start_lp = parseInt(param[6]);
@@ -1655,7 +1665,13 @@
           this.hostinfo.no_shuffle_deck = true;
         }
         if (rule.match(/(^|，|,)(IGPRIORITY|PR)(，|,|$)/)) {
-          this.hostinfo.enable_priority = true;
+          this.hostinfo.duel_rule = 3;
+        }
+        if ((param = rule.match(/(^|，|,)(DUELRULE|MR)(\d+)(，|,|$)/))) {
+          duel_rule = parseInt(param[3]);
+          if (duel_rule && duel_rule > 0 && duel_rule <= 4) {
+            this.hostinfo.duel_rule = duel_rule;
+          }
         }
         if (rule.match(/(^|，|,)(NOWATCH|NW)(，|,|$)/)) {
           this.hostinfo.no_watch = true;
@@ -1676,7 +1692,7 @@
       if ((settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.replay_safe) || (this.hostinfo.mode === 1 && settings.modules.replay_delay)) {
         this.hostinfo.replay_mode |= 0x2;
       }
-      param = [0, this.hostinfo.lflist, this.hostinfo.rule, this.hostinfo.mode, (this.hostinfo.enable_priority ? 'T' : 'F'), (this.hostinfo.no_check_deck ? 'T' : 'F'), (this.hostinfo.no_shuffle_deck ? 'T' : 'F'), this.hostinfo.start_lp, this.hostinfo.start_hand, this.hostinfo.draw_count, this.hostinfo.time_limit, this.hostinfo.replay_mode];
+      param = [0, this.hostinfo.lflist, this.hostinfo.rule, this.hostinfo.mode, this.hostinfo.duel_rule, (this.hostinfo.no_check_deck ? 'T' : 'F'), (this.hostinfo.no_shuffle_deck ? 'T' : 'F'), this.hostinfo.start_lp, this.hostinfo.start_hand, this.hostinfo.draw_count, this.hostinfo.time_limit, this.hostinfo.replay_mode];
       try {
         this.process = spawn('./ygopro', param, {
           cwd: 'ygopro'
@@ -2723,7 +2739,7 @@
               time_limit: 180,
               rule: (opt1 >> 5) & 3,
               mode: (opt1 >> 3) & 3,
-              enable_priority: !!((opt1 >> 2) & 1),
+              duel_rule: (!!((opt1 >> 2) & 1) ? 3 : 4),
               no_check_deck: !!((opt1 >> 1) & 1),
               no_shuffle_deck: !!(opt1 & 1),
               start_lp: opt2,
