@@ -24,6 +24,7 @@ ygopro-2pick
 /ygosrv233
 /challonge
 /logs
+/plugins
 
 test*
 *.heapsnapshot
