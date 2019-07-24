@@ -4737,7 +4737,7 @@
       return;
     }
     if (settings.modules.windbot.doom_bots) {
-      room.changing_side = false;
+      room.duel_stage = ygopro.constants.DUEL_STAGE.FINGER;
       ygopro.ctos_send(client.server, "HAND_RESULT", {
         res: (client.is_local ? 2 : 1)
       });
