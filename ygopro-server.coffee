@@ -3662,8 +3662,7 @@ ygopro.stoc_follow 'SELECT_TP', true, (buffer, info, client, server, datas)->
   room=ROOM_all[client.rid]
   return unless room
   if settings.modules.windbot.doom_bots
-    room.changing_side = false
-    room.selecting_hand = false
+    room.duel_stage = ygopro.constants.DUEL_STAGE.FIRSTGO
     ygopro.ctos_send(client.server, "TP_RESULT", {res: (if client.is_local then 1 else 0)})
     return true
   client.selected_preduel = false
