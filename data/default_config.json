@@ -80,11 +80,6 @@
       "enabled": false,
       "generate_count": 500
     },
-    "pre_release_compat": {
-      "enabled": false,
-      "official_database": "./ygopro/cards.cdb",
-      "pre_release_database": "./../ygopro-pre-data/expansions/pre-release.cdb"
-    },
     "random_duel": {
       "enabled": true,
       "no_rematch_check": false,
