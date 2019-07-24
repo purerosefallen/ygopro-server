@@ -3480,22 +3480,13 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
     CLIENT_kick(room.dueling_players[oppo_pos - win_pos])
     CLIENT_kick(room.dueling_players[oppo_pos - win_pos + 1]) if room.hostinfo.mode == 2
     return true
-  if settings.modules.side_restrict.enabled and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN
-    for code in settings.modules.side_restrict.restrict_cards
-      if _.indexOf(buff_side, code) > -1
-        ygopro.stoc_send_chat_to_room(room, "${invalid_side_rule}", ygopro.constants.COLORS.RED)
-        ygopro.stoc_send client, 'ERROR_MSG', {
-          msg: 3
-          code: 0
-        }
-        return true
-  struct = ygopro.structs["deck"]
-  struct._setBuff(buffer)
   if room.random_type or room.arena
     if client.pos == 0
       room.waiting_for_player = room.waiting_for_player2
     room.last_active_time = moment()
   else if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.deck_check and fs.readdirSync(settings.modules.tournament_mode.deck_path).length
+    struct = ygopro.structs["deck"]
+    struct._setBuff(buffer)
     struct.set("mainc", 1)
     struct.set("sidec", 1)
     struct.set("deckbuf", [4392470, 4392470])
