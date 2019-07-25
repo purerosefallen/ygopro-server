@@ -73,9 +73,6 @@
       "enabled": true,
       "get": false
     },
-    "koishi_roomlist": {
-      "enabled": true
-    },
     "vip": {
       "enabled": false,
       "generate_count": 500

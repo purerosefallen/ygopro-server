@@ -53,8 +53,7 @@
         "32": "HS_PLAYER_ENTER",
         "33": "HS_PLAYER_CHANGE",
         "34": "HS_WATCH_CHANGE",
-        "48": "FIELD_FINISH",
-        "49": "SRVPRO_ROOMLIST"
+        "48": "FIELD_FINISH"
     },
     "PLAYERCHANGE":{
         "8": "OBSERVE",
