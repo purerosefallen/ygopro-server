@@ -483,16 +483,15 @@
 
   if (settings.modules.windbot.enabled) {
     windbots = global.windbots = loadJSON(settings.modules.windbot.botlist).windbots;
-    real_windbot_server_ip = settings.modules.windbot.server_ip;
+    real_windbot_server_ip = global.real_windbot_server_ip = settings.modules.windbot.server_ip;
     if (!settings.modules.windbot.server_ip.includes("127.0.0.1")) {
       dns = require('dns');
       dns.lookup(settings.modules.windbot.server_ip, function(err, addr) {
         if (!err) {
-          return real_windbot_server_ip = addr;
+          return real_windbot_server_ip = global.real_windbot_server_ip = addr;
         }
       });
     }
-    global.real_windbot_server_ip = real_windbot_server_ip;
   }
 
   if (settings.modules.heartbeat_detection.enabled) {
@@ -5172,8 +5171,16 @@
           response.end("密码错误");
           return;
         } else {
-          getpath = u.pathname.split("/");
-          filename = path.basename(decodeURIComponent(getpath.pop()));
+          getpath = null;
+          filename = null;
+          try {
+            getpath = u.pathname.split("/");
+            filename = path.basename(decodeURIComponent(getpath.pop()));
+          } catch (error1) {
+            response.writeHead(404);
+            response.end("bad filename");
+            return;
+          }
           fs.readFile(settings.modules.tournament_mode.replay_path + filename, function(error, buffer) {
             if (error) {
               response.writeHead(404);
