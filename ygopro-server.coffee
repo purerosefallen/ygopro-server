@@ -1120,6 +1120,7 @@ class Room
     @turn = 0
     @duel_stage = ygopro.constants.DUEL_STAGE.BEGIN
     @replays = []
+    @first_list = []
     ROOM_all.push this
 
     @hostinfo ||= JSON.parse(JSON.stringify(settings.hostinfo))
@@ -1364,7 +1365,8 @@ class Room
         userscoreB: score_array[1].score,
         userdeckA: score_array[0].deck,
         userdeckB: score_array[1].deck,
-        replays: formatted_replays,
+        first: JSON.stringify(@first_list),
+        replays: JSON.stringify(formatted_replays),
         start: @start_time,
         end: end_time,
         arena: @arena
@@ -1689,13 +1691,13 @@ net.createServer (client) ->
     return
 
   server.on 'close', (had_error) ->
+    server.closed = true unless server.closed
+    if !server.client
+      return
     #log.info "server closed", server.client.name, had_error
     room=ROOM_all[server.client.rid]
     #log.info "server close", server.client.ip, ROOM_connected_ip[server.client.ip]
     room.disconnector = 'server' if room
-    server.closed = true unless server.closed
-    if !server.client
-      return
     unless server.client.closed
       ygopro.stoc_send_chat(server.client, "${server_closed}", ygopro.constants.COLORS.RED)
       #if room and settings.modules.replay_delay
@@ -1705,13 +1707,13 @@ net.createServer (client) ->
     return
 
   server.on 'error', (error)->
+    server.closed = error
+    if !server.client
+      return
     #log.info "server error", client.name, error
     room=ROOM_all[server.client.rid]
     #log.info "server err close", client.ip, ROOM_connected_ip[client.ip]
     room.disconnector = 'server' if room
-    server.closed = error
-    if !server.client
-      return
     unless server.client.closed
       ygopro.stoc_send_chat(server.client, "${server_error}: #{error}", ygopro.constants.COLORS.RED)
       #if room and settings.modules.replay_delay
@@ -1918,6 +1920,12 @@ net.createServer (client) ->
 
 if settings.modules.stop
   log.info "NOTE: server not open due to config, ", settings.modules.stop
+
+deck_name_match = global.deck_name_match = (deck_name, player_name) ->
+  if deck_name == player_name or deck_name == player_name + ".ydk" or deck_name == player_name + ".ydk.ydk"
+    return true
+  parsed_deck_name = deck_name.match(/^([^\+ \uff0b]+)[\+ \uff0b](.+?)(\.ydk){0,2}$/)
+  return parsed_deck_name and (player_name == parsed_deck_name[1] or player_name == parsed_deck_name[2])
 
 # 功能模块
 # return true to cancel a synchronous message
@@ -2193,7 +2201,7 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
           skip_track_visit: true
         json: true
       , (error, response, body)->
-        if body and body.user
+        if !error and body and body.user
           users_cache[client.name] = body.user.id
           secret = body.user.id % 65535 + 1
           decrypted_buffer = Buffer.allocUnsafe(6)
@@ -2201,6 +2209,10 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
             decrypted_buffer.writeUInt16LE(buffer.readUInt16LE(i) ^ secret, i)
           if check_buffer_indentity(decrypted_buffer)
             buffer = decrypted_buffer
+        else
+          log.warn("READ USER FAIL", error, body)
+          ygopro.stoc_die(client, "${create_room_failed}")
+          return
 
         # buffer != decrypted_buffer  ==> auth failed
 
@@ -2258,7 +2270,7 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
             return
           found = false
           for k,user of data
-            if user.participant and user.participant.name and _.endsWith(user.participant.name, client.name)
+            if user.participant and user.participant.name and deck_name_match(user.participant.name, client.name)
               found = user.participant
               break
           if !found
@@ -2589,6 +2601,8 @@ ygopro.stoc_follow 'GAME_MSG', true, (buffer, info, client, server, datas)->
   if ygopro.constants.MSG[msg] == 'START'
     playertype = buffer.readUInt8(1)
     client.is_first = !(playertype & 0xf)
+    if client.is_first and (room.hostinfo.mode != 2 or client.pos == 0 or client.pos == 2)
+      room.first_list[room.duel_count - 1] = client.name_vpass
     client.lp = room.hostinfo.start_lp
     client.card_count = 0 if room.hostinfo.mode != 2
     room.duel_stage = ygopro.constants.DUEL_STAGE.DUELING
@@ -3470,9 +3484,7 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
     found_deck=false
     decks=fs.readdirSync(settings.modules.tournament_mode.deck_path)
     for deck in decks
-      if _.endsWith(deck, client.name+".ydk")
-        found_deck=deck
-      if _.endsWith(deck, client.name+".ydk.ydk")
+      if deck_name_match(deck, client.name)
         found_deck=deck
     if found_deck
       deck_text=fs.readFileSync(settings.modules.tournament_mode.deck_path+found_deck,{encoding:"ASCII"})
