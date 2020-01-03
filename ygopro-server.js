@@ -1613,7 +1613,7 @@
         }
         if ((param = rule.match(/(^|，|,)(DUELRULE|MR)(\d+)(，|,|$)/))) {
           duel_rule = parseInt(param[3]);
-          if (duel_rule && duel_rule > 0 && duel_rule <= 4) {
+          if (duel_rule && duel_rule > 0 && duel_rule <= 5) {
             this.hostinfo.duel_rule = duel_rule;
           }
         }
@@ -2041,6 +2041,9 @@
               if (player.pos !== 7) {
                 this.scores[player.name_vpass] = -5;
               }
+            }
+            if (this.players.length === 2) {
+              this.scores[client.name_vpass] = -9;
             }
           }
           this.arena_score_handled = true;
@@ -3270,9 +3273,6 @@
     if (ygopro.constants.MSG[msg] === 'START') {
       playertype = buffer.readUInt8(1);
       client.is_first = !(playertype & 0xf);
-      if (client.is_first && (room.hostinfo.mode !== 2 || client.pos === 0 || client.pos === 2)) {
-        room.first_list[room.duel_count - 1] = client.name_vpass;
-      }
       client.lp = room.hostinfo.start_lp;
       if (room.hostinfo.mode !== 2) {
         client.card_count = 0;
@@ -3288,6 +3288,9 @@
             ygopro.stoc_send_chat_to_room(room, "${death_start_extra}", ygopro.constants.COLORS.BABYBLUE);
           }
         }
+      }
+      if (client.is_first && (room.hostinfo.mode !== 2 || client.pos === 0 || client.pos === 2)) {
+        room.first_list.push(client.name_vpass);
       }
       if (settings.modules.retry_handle.enabled) {
         client.retry_count = 0;
