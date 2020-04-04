@@ -10,6 +10,7 @@ exec = require('child_process').exec
 execFile = require('child_process').execFile
 spawn = require('child_process').spawn
 spawnSync = require('child_process').spawnSync
+_async = require('async')
 
 # 三方库
 _ = global._ = require 'underscore'
@@ -140,11 +141,15 @@ try
 catch e
   log.info e unless e.code == 'ENOENT'
 
-setting_save = global.setting_save = (settings) ->
-  fs.writeFileSync(settings.file, JSON.stringify(settings, null, 2))
+setting_save = global.setting_save = (settings, callback) ->
+  if !callback
+    callback = (err) ->
+      if(err)
+        log.warn("setting save fail", err.toString())
+  fs.writeFile(settings.file, JSON.stringify(settings, null, 2), callback)
   return
 
-setting_change = global.setting_change = (settings, path, val) ->
+setting_change = global.setting_change = (settings, path, val, callback) ->
   # path should be like "modules:welcome"
   log.info("setting changed", path, val) if _.isString(val)
   path=path.split(':')
@@ -157,7 +162,7 @@ setting_change = global.setting_change = (settings, path, val) ->
       target=target[key]
     key = path.shift()
     target[key] = val
-  setting_save(settings)
+  setting_save(settings, callback)
   return
 
 VIP_generate_cdkeys = global.VIP_generate_cdkeys = (key_type, count) ->
@@ -557,20 +562,27 @@ ROOM_connected_ip = global.ROOM_connected_ip = {}
 ROOM_bad_ip = global.ROOM_bad_ip = {}
 
 # ban a user manually and permanently
-ban_user = global.ban_user = (name) ->
+ban_user = global.ban_user = (name, callback) ->
   settings.ban.banned_user.push(name)
   setting_save(settings)
-  bad_ip=0
-  for room in ROOM_all when room and room.established
-    for player in room.players
-      if player and (player.name == name or player.ip == bad_ip)
-        bad_ip = player.ip
-        ROOM_bad_ip[bad_ip]=99
-        settings.ban.banned_ip.push(player.ip)
-        ygopro.stoc_send_chat_to_room(room, "#{player.name} ${kicked_by_system}", ygopro.constants.COLORS.RED)
-        CLIENT_send_replays(player, room)
-        CLIENT_kick(player)
-        continue
+  bad_ip = []
+  _async.each(ROOM_all, (room, done)-> 
+    if !(room and room.established)
+      done()
+      return
+    _async.each(["players", "watchers"], (player_type, _done)->
+      _async.each(room[player_type], (player, __done)->
+        if player and (player.name == name or bad_ip.indexOf(player.ip) != -1)
+          bad_ip.push(player.ip)
+          ROOM_bad_ip[bad_ip]=99
+          settings.ban.banned_ip.push(player.ip)
+          ygopro.stoc_send_chat_to_room(room, "#{player.name} ${kicked_by_system}", ygopro.constants.COLORS.RED)
+          CLIENT_send_replays(player, room)
+          CLIENT_kick(player)
+        __done()
+      , _done)
+    , done)
+  , callback)
   return
 
 # automatically ban user to use random duel
@@ -590,6 +602,28 @@ ROOM_ban_player = global.ROOM_ban_player = (name, ip, reason, countadd = 1)->
     ROOM_players_banned.push(bannedplayer)
   #log.info("banned", name, ip, reason, bannedplayer.count)
   return
+
+ROOM_kick = (name, callback)->
+  found = false
+  _async.each(ROOM_all, (room, done)->
+    if !(room and room.established and (name == "all" or name == room.process_pid.toString() or name == room.name))
+      done()
+      return
+    found = true
+    if room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN
+      room.scores[room.dueling_players[0].name_vpass] = 0
+      room.scores[room.dueling_players[1].name_vpass] = 0
+    room.kicked = true
+    room.send_replays()
+    room.process.kill()
+    room.delete()
+    done()
+    return
+  , (err)->
+    callback(null, found)
+    return
+  )
+
 
 ROOM_player_win = global.ROOM_player_win = (name)->
   if !ROOM_players_scores[name]
@@ -2090,7 +2124,7 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
         checksum += buf.readUInt8(i)
       (checksum & 0xFF) == 0
 
-    buffer_handle_callback = (buffer, decrypted_buffer, match_permit)->
+    create_room_with_action = (buffer, decrypted_buffer, match_permit)->
       if client.closed
         return
       action = buffer.readUInt8(1) >> 4
@@ -2215,67 +2249,90 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
         room.connect(client)
       return
 
-    match_permit_callback = (buffer, match_permit) ->
-      if client.closed
+    _async.auto({
+      match_permit: (done) ->
+        if client.closed
+          done()
+          return
+        if(!settings.modules.arena_mode.check_permit)
+          done(null, null)
+          return
+        request
+          url: settings.modules.arena_mode.check_permit,
+          json: true,
+          qs:
+            username: client.name,
+            password: info.pass,
+            arena: settings.modules.arena_mode.mode
+        , (error, response, body)->
+          if client.closed
+            done(null, null)
+            return
+          if !error and body
+            done(null, body)
+          else
+            log.warn("Match permit request error", error)
+            match_permit_callback(null, null)
+          return
         return
-      if id = users_cache[client.name]
-        secret = id % 65535 + 1
-        decrypted_buffer = Buffer.allocUnsafe(6)
-        for i in [0, 2, 4]
-          decrypted_buffer.writeUInt16LE(buffer.readUInt16LE(i) ^ secret, i)
-        if check_buffer_indentity(decrypted_buffer)
-          return buffer_handle_callback(decrypted_buffer, decrypted_buffer, match_permit)
-
-      #TODO: query database directly, like preload.
-      request
-        baseUrl: settings.modules.mycard.auth_base_url,
-        url: '/users/' + encodeURIComponent(client.name) + '.json',
-        qs:
-          api_key: settings.modules.mycard.auth_key,
-          api_username: client.name,
-          skip_track_visit: true
-        json: true
-      , (error, response, body)->
-        if !error and body and body.user
-          users_cache[client.name] = body.user.id
-          secret = body.user.id % 65535 + 1
+      get_user: (done) ->
+        if client.closed
+          done()
+          return
+        if id = users_cache[client.name]
+          secret = id % 65535 + 1
           decrypted_buffer = Buffer.allocUnsafe(6)
           for i in [0, 2, 4]
             decrypted_buffer.writeUInt16LE(buffer.readUInt16LE(i) ^ secret, i)
           if check_buffer_indentity(decrypted_buffer)
-            buffer = decrypted_buffer
-        else
-          log.warn("READ USER FAIL", error, body)
-          ygopro.stoc_die(client, "${create_room_failed}")
-          return
+            done(null, {
+              original: decrypted_buffer,
+              decrypted: decrypted_buffer
+            })
+            return
 
-        # buffer != decrypted_buffer  ==> auth failed
+        #TODO: query database directly, like preload.
+        request
+          baseUrl: settings.modules.mycard.auth_base_url,
+          url: '/users/' + encodeURIComponent(client.name) + '.json',
+          qs:
+            api_key: settings.modules.mycard.auth_key,
+            api_username: client.name,
+            skip_track_visit: true
+          json: true
+        , (error, response, body)->
+          if !error and body and body.user
+            users_cache[client.name] = body.user.id
+            secret = body.user.id % 65535 + 1
+            decrypted_buffer = Buffer.allocUnsafe(6)
+            for i in [0, 2, 4]
+              decrypted_buffer.writeUInt16LE(buffer.readUInt16LE(i) ^ secret, i)
+            if check_buffer_indentity(decrypted_buffer)
+              buffer = decrypted_buffer
+          else
+            log.warn("READ USER FAIL", error, body)
+            done("${create_room_failed}")
+            return
 
-        if !check_buffer_indentity(buffer)
-          ygopro.stoc_die(client, '${invalid_password_checksum}')
-          return
-        return buffer_handle_callback(buffer, decrypted_buffer, match_permit)
-      return
+          # buffer != decrypted_buffer  ==> auth failed
 
-    if settings.modules.arena_mode.check_permit
-      request
-        url: settings.modules.arena_mode.check_permit,
-        json: true,
-        qs:
-          username: client.name,
-          password: info.pass,
-          arena: settings.modules.arena_mode.mode
-      , (error, response, body)->
-        if client.closed
+          if !check_buffer_indentity(buffer)
+            done('${invalid_password_checksum}')
+            return
+          done(null, {
+            original: buffer,
+            decrypted: decrypted_buffer
+          })
           return
-        if !error and body
-          match_permit_callback(buffer, body)
-        else
-          log.warn("Match permit request error", error)
-          match_permit_callback(buffer, null)
         return
-    else
-      match_permit_callback(buffer, null)
+    }, (err, data) ->
+      if(client.closed)
+        return
+      if(err)
+        ygopro.stoc_die(client, err)
+        return
+      create_room_with_action(data.get_user.original, data.get_user.decrypted, data.match_permit)
+    )
 
 
   else if settings.modules.challonge.enabled
@@ -2293,87 +2350,86 @@ ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
     else
       ygopro.stoc_send_chat(client, '${loading_user_info}', ygopro.constants.COLORS.BABYBLUE)
       client.setTimeout(300000) #连接后超时5分钟
-      challonge.participants._index({
-        id: settings.modules.challonge.tournament_id,
-        callback: (err, data) ->
-          if client.closed
-            return
-          if err or !data
-            if err
-              log.warn("Failed loading Challonge user info", err)
-            ygopro.stoc_die(client, '${challonge_match_load_failed}')
-            return
-          found = false
-          for k,user of data
-            if user.participant and user.participant.name and deck_name_match(user.participant.name, client.name)
-              found = user.participant
-              break
-          if !found
-            ygopro.stoc_die(client, '${challonge_user_not_found}')
-            return
-          client.challonge_info = found
-          challonge.matches._index({
+      _async.auto({
+        participant_data: (done) ->
+          challonge.participants._index({
             id: settings.modules.challonge.tournament_id,
-            callback: (err, data) ->
-              if client.closed
-                return
-              if err or !data
-                if err
-                  log.warn("Failed loading Challonge match info", err)
-                ygopro.stoc_die(client, '${challonge_match_load_failed}')
-                return
-              found = false
-              for k,match of data
-                if match and match.match and !match.match.winnerId and match.match.state != "complete" and match.match.player1Id and match.match.player2Id and (match.match.player1Id == client.challonge_info.id or match.match.player2Id == client.challonge_info.id)
-                  found = match.match
-                  break
-              if !found
-                ygopro.stoc_die(client, '${challonge_match_not_found}')
-                return
-              #if found.winnerId
-              #  ygopro.stoc_die(client, '${challonge_match_already_finished}')
-              #  return
-              room = ROOM_find_or_create_by_name('M#' + found.id)
-              if room
-                room.challonge_info = found
-                # room.max_player = 2
-                room.welcome = "${challonge_match_created}"
-              if !room
-                ygopro.stoc_die(client, "${server_full}")
-              else if room.error
-                ygopro.stoc_die(client, room.error)
-              else if room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN
-                if settings.modules.cloud_replay.enable_halfway_watch and !room.hostinfo.no_watch
-                  #client.setTimeout(300000) #连接后超时5分钟
-                  client.rid = _.indexOf(ROOM_all, room)
-                  client.is_post_watcher = true
-                  if settings.modules.vip.enabled and client.vip and vip_info.players[client.name].words
-                    for line in _.lines vip_info.players[client.name].words
-                      ygopro.stoc_send_chat_to_room(room, line, ygopro.constants.COLORS.PINK)
-                  else if settings.modules.words.enabled and words.words[client.name]
-                    for line in _.lines words.words[client.name][Math.floor(Math.random() * words.words[client.name].length)]
-                      ygopro.stoc_send_chat_to_room(room, line, ygopro.constants.COLORS.PINK)
-                  ygopro.stoc_send_chat_to_room(room, "#{client.name} ${watch_join}")
-                  room.watchers.push client
-                  ygopro.stoc_send_chat(client, "${watch_watching}", ygopro.constants.COLORS.BABYBLUE)
-                  for buffer in room.watcher_buffers
-                    client.write buffer
-                else
-                  ygopro.stoc_die(client, "${watch_denied}")
-              else if room.hostinfo.no_watch and room.players.length >= (if room.hostinfo.mode == 2 then 4 else 2)
-                ygopro.stoc_die(client, "${watch_denied_room}")
-              else
-                for player in room.get_playing_player() when player and player != client and player.challonge_info.id == client.challonge_info.id
-                  ygopro.stoc_die(client, "${challonge_player_already_in}")
-                  return
-                #client.room = room
-                #client.setTimeout(300000) #连接后超时5分钟
-                client.rid = _.indexOf(ROOM_all, room)
-                room.connect(client)
-              return
+            callback: done
           })
           return
-      })
+        ,
+        match_data: (done) ->
+          challonge.matches._index({
+            id: settings.modules.challonge.tournament_id,
+            callback: done
+          })
+          return
+      }, (err, datas) ->
+        if client.closed
+          return
+        if err or !datas.participant_data or !datas.match_data
+          log.warn("Failed loading Challonge user info", err)
+          ygopro.stoc_die(client, '${challonge_match_load_failed}')
+          return
+        found = false
+        for k,user of datas.participant_data
+          if user.participant and user.participant.name and deck_name_match(user.participant.name, client.name)
+            found = user.participant
+            break
+        if !found
+          ygopro.stoc_die(client, '${challonge_user_not_found}')
+          return
+        client.challonge_info = found
+        found = false
+        for k,match of datas.match_data
+          if match and match.match and !match.match.winnerId and match.match.state != "complete" and match.match.player1Id and match.match.player2Id and (match.match.player1Id == client.challonge_info.id or match.match.player2Id == client.challonge_info.id)
+            found = match.match
+            break
+        if !found
+          ygopro.stoc_die(client, '${challonge_match_not_found}')
+          return
+        #if found.winnerId
+        #  ygopro.stoc_die(client, '${challonge_match_already_finished}')
+        #  return
+        room = ROOM_find_or_create_by_name('M#' + found.id)
+        if room
+          room.challonge_info = found
+          # room.max_player = 2
+          room.welcome = "${challonge_match_created}"
+        if !room
+          ygopro.stoc_die(client, "${server_full}")
+        else if room.error
+          ygopro.stoc_die(client, room.error)
+        else if room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN
+          if settings.modules.cloud_replay.enable_halfway_watch and !room.hostinfo.no_watch
+            #client.setTimeout(300000) #连接后超时5分钟
+            client.rid = _.indexOf(ROOM_all, room)
+            client.is_post_watcher = true
+            if settings.modules.vip.enabled and client.vip and vip_info.players[client.name].words
+              for line in _.lines vip_info.players[client.name].words
+                ygopro.stoc_send_chat_to_room(room, line, ygopro.constants.COLORS.PINK)
+            else if settings.modules.words.enabled and words.words[client.name]
+              for line in _.lines words.words[client.name][Math.floor(Math.random() * words.words[client.name].length)]
+                ygopro.stoc_send_chat_to_room(room, line, ygopro.constants.COLORS.PINK)
+            ygopro.stoc_send_chat_to_room(room, "#{client.name} ${watch_join}")
+            room.watchers.push client
+            ygopro.stoc_send_chat(client, "${watch_watching}", ygopro.constants.COLORS.BABYBLUE)
+            for buffer in room.watcher_buffers
+              client.write buffer
+          else
+            ygopro.stoc_die(client, "${watch_denied}")
+        else if room.hostinfo.no_watch and room.players.length >= (if room.hostinfo.mode == 2 then 4 else 2)
+          ygopro.stoc_die(client, "${watch_denied_room}")
+        else
+          for player in room.get_playing_player() when player and player != client and player.challonge_info.id == client.challonge_info.id
+            ygopro.stoc_die(client, "${challonge_player_already_in}")
+            return
+          #client.room = room
+          #client.setTimeout(300000) #连接后超时5分钟
+          client.rid = _.indexOf(ROOM_all, room)
+          room.connect(client)
+        return
+      )
 
   else if !client.name or client.name==""
     ygopro.stoc_die(client, "${bad_user_name}")
@@ -2539,7 +2595,7 @@ ygopro.stoc_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
   return
 
 # 登场台词
-load_words = global.load_words = () ->
+load_words = global.load_words = (callback) ->
   request
     url: settings.modules.words.get
     json: true
@@ -2551,13 +2607,15 @@ load_words = global.load_words = () ->
     else
       setting_change(words, "words", body)
       log.info "words loaded", _.size words.words
+    if callback
+      callback(error, body)
     return
   return
 
 if settings.modules.words.get
   load_words()
 
-load_dialogues = global.load_dialogues = () ->
+load_dialogues = global.load_dialogues = (callback) ->
   request
     url: settings.modules.dialogues.get
     json: true
@@ -2569,10 +2627,12 @@ load_dialogues = global.load_dialogues = () ->
     else
       setting_change(dialogues, "dialogues", body)
       log.info "dialogues loaded", _.size dialogues.dialogues
+    if callback
+      callback(error, body)
     return
   return
 
-load_dialogues_custom = global.load_dialogues_custom = () ->
+load_dialogues_custom = global.load_dialogues_custom = (callback) ->
   request
     url: settings.modules.dialogues.get_custom
     json: true
@@ -2584,6 +2644,8 @@ load_dialogues_custom = global.load_dialogues_custom = () ->
     else
       setting_change(dialogues, "dialogues_custom", body)
       log.info "custom dialogues loaded", _.size dialogues.dialogues_custom
+    if callback
+      callback(error, body)
     return
   return
 
@@ -3045,7 +3107,7 @@ ygopro.stoc_send_random_tip_to_room = (room)->
       ygopro.stoc_send_random_tip(player)
   return
 
-load_tips = global.load_tips = ()->
+load_tips = global.load_tips = (callback)->
   request
     url: settings.modules.tips.get
     json: true
@@ -3057,10 +3119,12 @@ load_tips = global.load_tips = ()->
     else
       setting_change(tips, "tips", body)
       log.info "tips loaded", tips.tips.length
+    if callback
+      callback(error, body)
     return
   return
 
-load_tips_zh = global.load_tips_zh = ()->
+load_tips_zh = global.load_tips_zh = (callback)->
   request
     url: settings.modules.tips.get_zh
     json: true
@@ -3072,6 +3136,8 @@ load_tips_zh = global.load_tips_zh = ()->
     else
       setting_change(tips, "tips_zh", body)
       log.info "zh tips loaded", tips.tips_zh.length
+    if callback
+      callback(error, body)
     return
   return
 
@@ -3769,7 +3835,10 @@ ygopro.stoc_follow 'REPLAY', true, (buffer, info, client, server, datas)->
 
 if settings.modules.random_duel.enabled
   setInterval ()->
-    for room in ROOM_all when room and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and room.random_type and room.last_active_time and room.waiting_for_player and room.get_disconnected_count() == 0 and (!settings.modules.side_timeout or room.duel_stage != ygopro.constants.DUEL_STAGE.SIDING)
+    _async.each(ROOM_all, (room, done) ->
+      if !(room and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and room.random_type and room.last_active_time and room.waiting_for_player and room.get_disconnected_count() == 0 and (!settings.modules.side_timeout or room.duel_stage != ygopro.constants.DUEL_STAGE.SIDING))
+        done()
+        return
       time_passed = Math.floor((moment() - room.last_active_time) / 1000)
       #log.info time_passed
       if time_passed >= settings.modules.random_duel.hang_timeout
@@ -3783,12 +3852,18 @@ if settings.modules.random_duel.enabled
       else if time_passed >= (settings.modules.random_duel.hang_timeout - 20) and not (time_passed % 10)
         ygopro.stoc_send_chat_to_room(room, "#{room.waiting_for_player.name} ${afk_warn_part1}#{settings.modules.random_duel.hang_timeout - time_passed}${afk_warn_part2}", ygopro.constants.COLORS.RED)
         ROOM_unwelcome(room, room.waiting_for_player, "${random_ban_reason_AFK}")
+      done()
+      return
+    )
     return
   , 1000
 
 if settings.modules.mycard.enabled
   setInterval ()->
-    for room in ROOM_all when room and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and room.arena and room.last_active_time and room.waiting_for_player and room.get_disconnected_count() == 0 and (!settings.modules.side_timeout or room.duel_stage != ygopro.constants.DUEL_STAGE.SIDING)
+    _async.each(ROOM_all, (room, done) ->
+      if not (room and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and room.arena and room.last_active_time and room.waiting_for_player and room.get_disconnected_count() == 0 and (!settings.modules.side_timeout or room.duel_stage != ygopro.constants.DUEL_STAGE.SIDING))
+        done()
+        return
       time_passed = Math.floor((moment() - room.last_active_time) / 1000)
       #log.info time_passed
       if time_passed >= settings.modules.random_duel.hang_timeout
@@ -3800,8 +3875,15 @@ if settings.modules.mycard.enabled
         CLIENT_kick(room.waiting_for_player)
       else if time_passed >= (settings.modules.random_duel.hang_timeout - 20) and not (time_passed % 10)
         ygopro.stoc_send_chat_to_room(room, "#{room.waiting_for_player.name} ${afk_warn_part1}#{settings.modules.random_duel.hang_timeout - time_passed}${afk_warn_part2}", ygopro.constants.COLORS.RED)
+      done()
+      return
+    )
+    
     if settings.modules.arena_mode.punish_quit_before_match
-      for room in ROOM_all when room and room.arena and room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and room.get_playing_player().length < 2
+      _async.each(ROOM_all, (room, done) ->
+        if not (room and room.arena and room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and room.get_playing_player().length < 2)
+          done()
+          return
         player = room.get_playing_player()[0]
         if player and player.join_time and !player.arena_quit_free
           waited_time = moment() - player.join_time
@@ -3810,22 +3892,33 @@ if settings.modules.mycard.enabled
             player.arena_quit_free = true
           else if waited_time >= 5000 and waited_time < 6000
             ygopro.stoc_send_chat(player, "${arena_wait_hint}", ygopro.constants.COLORS.BABYBLUE)
+        done()
+        return
+      )
     return
   , 1000
 
 if settings.modules.heartbeat_detection.enabled
   setInterval ()->
-    for room in ROOM_all when room and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and (room.hostinfo.time_limit == 0 or room.duel_stage != ygopro.constants.DUEL_STAGE.DUELING) and !room.windbot
-      for player in room.get_playing_player() when player and (room.duel_stage != ygopro.constants.DUEL_STAGE.SIDING or player.selected_preduel)
-        CLIENT_heartbeat_register(player, true)
+    _async.each ROOM_all, (room, done)->
+      if room and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and (room.hostinfo.time_limit == 0 or room.duel_stage != ygopro.constants.DUEL_STAGE.DUELING) and !room.windbot
+        _async.each(room.get_playing_player(), (player, _done)->
+          if player and (room.duel_stage != ygopro.constants.DUEL_STAGE.SIDING or player.selected_preduel)
+            CLIENT_heartbeat_register(player, true)
+          _done()
+        , done)
+      else
+        done()
     return
   , settings.modules.heartbeat_detection.interval
 
 setInterval ()->
   current_time = moment()
-  for room in ROOM_all when room and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and room.hostinfo.auto_death and !room.auto_death_triggered and current_time - moment(room.start_time) > 60000 * room.hostinfo.auto_death
-    room.auto_death_triggered = true
-    room.start_death()
+  _async.each ROOM_all, (room, done)->
+    if room and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and room.hostinfo.auto_death and !room.auto_death_triggered and current_time - moment(room.start_time) > 60000 * room.hostinfo.auto_death
+      room.auto_death_triggered = true
+      room.start_death()
+    done()
 
 , 1000
 
@@ -3845,13 +3938,13 @@ spawn_windbot = global.spawn_windbot = () ->
   windbot_process = spawn windbot_bin, windbot_parameters, {cwd: 'windbot'}
   windbot_process.on 'error', (err)->
     log.warn 'WindBot ERROR', err
-    if windbot_looplimit < 1000 and !rebooted
+    if windbot_looplimit < 1000 and !global.rebooted
       windbot_looplimit++
       spawn_windbot()
     return
   windbot_process.on 'exit', (code)->
     log.warn 'WindBot EXIT', code
-    if windbot_looplimit < 1000 and !rebooted
+    if windbot_looplimit < 1000 and !global.rebooted
       windbot_looplimit++
       spawn_windbot()
     return
@@ -3868,7 +3961,7 @@ spawn_windbot = global.spawn_windbot = () ->
 if settings.modules.windbot.enabled and settings.modules.windbot.spawn
   spawn_windbot()
 
-rebooted = false
+global.rebooted = false
 #http
 if settings.modules.http
 
@@ -3883,31 +3976,40 @@ if settings.modules.http
 
     #console.log(u.query.username, u.query.pass)
     if u.pathname == '/api/getrooms'
-      pass_validated = auth.auth(u.query.username, u.query.pass, "get_rooms", "get_rooms")
+      pass_validated = auth.auth(u.query.username, u.query.pass, "get_rooms", "get_rooms", true)
       if !settings.modules.http.public_roomlist and !pass_validated
         response.writeHead(200)
         response.end(addCallback(u.query.callback, '{"rooms":[{"roomid":"0","roomname":"密码错误","needpass":"true"}]}'))
       else
-        response.writeHead(200)
-        roomsjson = JSON.stringify rooms: (for room in ROOM_all when room and room.established
-          roomid: room.process_pid.toString(),
-          roomname: if pass_validated then room.name else room.name.split('$', 2)[0],
-          roommode: room.hostinfo.mode,
-          needpass: (room.name.indexOf('$') != -1).toString(),
-          users: _.sortBy((for player in room.players when player.pos?
-            id: (-1).toString(),
-            name: player.name,
-            ip: if settings.modules.http.show_ip and pass_validated and !player.is_local then player.ip.slice(7) else null,
-            status: if settings.modules.http.show_info and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and player.pos != 7 then (
-              score: room.scores[player.name_vpass],
-              lp: if player.lp? then player.lp else room.hostinfo.start_lp,
-              cards: if room.hostinfo.mode != 2 then (if player.card_count? then player.card_count else room.hostinfo.start_hand) else null
-            ) else null,
-            pos: player.pos
-          ), "pos"),
-          istart: if room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN then (if settings.modules.http.show_info then ("Duel:" + room.duel_count + " " + (if room.duel_stage == ygopro.constants.DUEL_STAGE.SIDING then "Siding" else "Turn:" + (if room.turn? then room.turn else 0) + (if room.death then "/" + (if room.death > 0 then room.death - 1 else "Death") else ""))) else 'start') else 'wait'
-        ), null, 2
-        response.end(addCallback(u.query.callback, roomsjson))
+        roomsjson = [];
+        _async.each(ROOM_all, (room, done)->
+          if !(room and room.established)
+            done()
+            return
+          roomsjson.push({
+            roomid: room.process_pid.toString(),
+            roomname: if pass_validated then room.name else room.name.split('$', 2)[0],
+            roommode: room.hostinfo.mode,
+            needpass: (room.name.indexOf('$') != -1).toString(),
+            users: _.sortBy((for player in room.players when player.pos?
+              id: (-1).toString(),
+              name: player.name,
+              ip: if settings.modules.http.show_ip and pass_validated and !player.is_local then player.ip.slice(7) else null,
+              status: if settings.modules.http.show_info and room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and player.pos != 7 then (
+                score: room.scores[player.name_vpass],
+                lp: if player.lp? then player.lp else room.hostinfo.start_lp,
+                cards: if room.hostinfo.mode != 2 then (if player.card_count? then player.card_count else room.hostinfo.start_hand) else null
+              ) else null,
+              pos: player.pos
+            ), "pos"),
+            istart: if room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN then (if settings.modules.http.show_info then ("Duel:" + room.duel_count + " " + (if room.duel_stage == ygopro.constants.DUEL_STAGE.SIDING then "Siding" else "Turn:" + (if room.turn? then room.turn else 0) + (if room.death then "/" + (if room.death > 0 then room.death - 1 else "Death") else ""))) else 'start') else 'wait'
+          })
+          done()
+        , ()->
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, JSON.stringify({rooms: roomsjson})))
+        )
+
 
     else if u.pathname == '/api/duellog' and settings.modules.tournament_mode.enabled
       if !auth.auth(u.query.username, u.query.pass, "duel_log", "duel_log")
@@ -4042,18 +4144,26 @@ if settings.modules.http
           return
         if u.query.stop == 'false'
           u.query.stop = false
-        setting_change(settings, 'modules:stop', u.query.stop)
-        response.writeHead(200)
-        response.end(addCallback(u.query.callback, "['stop ok', '" + u.query.stop + "']"))
+        setting_change(settings, 'modules:stop', u.query.stop, (err)->
+          response.writeHead(200)
+          if(err)
+            response.end(addCallback(u.query.callback, "['stop fail', '" + u.query.stop + "']"))
+          else
+            response.end(addCallback(u.query.callback, "['stop ok', '" + u.query.stop + "']"))
+        )
 
       else if u.query.welcome
         if !auth.auth(u.query.username, u.query.pass, "change_settings", "change_welcome")
           response.writeHead(200)
           response.end(addCallback(u.query.callback, "['密码错误', 0]"))
           return
-        setting_change(settings, 'modules:welcome', u.query.welcome)
-        response.writeHead(200)
-        response.end(addCallback(u.query.callback, "['welcome ok', '" + u.query.welcome + "']"))
+        setting_change(settings, 'modules:welcome', (err)->
+          response.writeHead(200)
+          if(err)
+            response.end(addCallback(u.query.callback, "['welcome fail', '" + u.query.welcome + "']"))
+          else
+            response.end(addCallback(u.query.callback, "['welcome ok', '" + u.query.welcome + "']"))
+        )
 
       else if u.query.getwelcome
         if !auth.auth(u.query.username, u.query.pass, "change_settings", "get_welcome")
@@ -4068,57 +4178,65 @@ if settings.modules.http
           response.writeHead(200)
           response.end(addCallback(u.query.callback, "['密码错误', 0]"))
           return
-        load_tips()
+        tasks = {
+          tips: load_tips
+        }
         if settings.modules.tips.get_zh
-          load_tips_zh()
-        response.writeHead(200)
-        response.end(addCallback(u.query.callback, "['loading tip', '" + settings.modules.tips.get + (if settings.modules.tips.get_zh then " and " + settings.modules.tips.get_zh else "") + "']"))
+          tasks.tips_zh = load_tips_zh
+        _async.auto(tasks, (err)->
+          response.writeHead(200)
+          if(err)
+            response.end(addCallback(u.query.callback, "['tip fail', '" + settings.modules.tips.get + "']"))
+          else
+            response.end(addCallback(u.query.callback, "['tip ok', '" +  settings.modules.tips.get + "']"))
+        )
 
       else if u.query.loaddialogues
         if !auth.auth(u.query.username, u.query.pass, "change_settings", "change_dialogues")
           response.writeHead(200)
           response.end(addCallback(u.query.callback, "['密码错误', 0]"))
           return
-        load_dialogues()
+        tasks = {
+          dialogues: load_dialogues
+        }
         if settings.modules.dialogues.get_custom
-          load_dialogues_custom()
-        response.writeHead(200)
-        response.end(addCallback(u.query.callback, "['loading dialogues', '" + settings.modules.dialogues.get + (if settings.modules.dialogues.get_custom then " and " + settings.modules.dialogues.get_custom else "") + "']"))
-
-      else if u.query.loadwords
-        load_words()
-        response.writeHead(200)
-        response.end(addCallback(u.query.callback, "['loading words', '" + settings.modules.words.get + "']"))
+          tasks.dialogues_custom = load_dialogues_custom
+        _async.auto(tasks, (err)->
+          response.writeHead(200)
+          if(err)
+            response.end(addCallback(u.query.callback, "['dialogues fail', '" + settings.modules.dialogues.get + "']"))
+          else
+            response.end(addCallback(u.query.callback, "['dialogues ok', '" +settings.modules.dialogues.get + "']"))
+        )
 
       else if u.query.ban
         if !auth.auth(u.query.username, u.query.pass, "ban_user", "ban_user")
           response.writeHead(200)
           response.end(addCallback(u.query.callback, "['密码错误', 0]"))
           return
-        ban_user(u.query.ban)
-        response.writeHead(200)
-        response.end(addCallback(u.query.callback, "['ban ok', '" + u.query.ban + "']"))
+        ban_user(u.query.ban, (err)->
+          response.writeHead(200)
+          if(err)
+            response.end(addCallback(u.query.callback, "['ban fail', '" + u.query.ban + "']"))
+          else
+            response.end(addCallback(u.query.callback, "['ban ok', '" + u.query.ban + "']"))
+        )
 
       else if u.query.kick
         if !auth.auth(u.query.username, u.query.pass, "kick_user", "kick_user")
           response.writeHead(200)
           response.end(addCallback(u.query.callback, "['密码错误', 0]"))
           return
-        kick_room_found = false
-        for room in ROOM_all when room and room.established and (u.query.kick == "all" or u.query.kick == room.process_pid.toString() or u.query.kick == room.name)
-          kick_room_found = true
-          if room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN
-            room.scores[room.dueling_players[0].name_vpass] = 0
-            room.scores[room.dueling_players[1].name_vpass] = 0
-          room.kicked = true
-          room.send_replays()
-          room.process.kill()
-          room.delete()
-        response.writeHead(200)
-        if kick_room_found
-          response.end(addCallback(u.query.callback, "['kick ok', '" + u.query.kick + "']"))
-        else
-          response.end(addCallback(u.query.callback, "['room not found', '" + u.query.kick + "']"))
+        ROOM_kick(u.query.kick, (err, found)->
+          response.writeHead(200)
+          if err
+            response.end(addCallback(u.query.callback, "['kick fail', '" + u.query.kick + "']"))
+          else if found
+            response.end(addCallback(u.query.callback, "['kick ok', '" + u.query.kick + "']"))
+          else
+            response.end(addCallback(u.query.callback, "['room not found', '" + u.query.kick + "']"))
+        )
+        
 
       else if u.query.death
         if !auth.auth(u.query.username, u.query.pass, "start_death", "start_death")
@@ -4126,14 +4244,21 @@ if settings.modules.http
           response.end(addCallback(u.query.callback, "['密码错误', 0]"))
           return
         death_room_found = false
-        for room in ROOM_all when room and (u.query.death == "all" or u.query.death == room.process_pid.toString() or u.query.death == room.name)
+        _async.each(ROOM_all, (room, done)->
+          if !(room and (u.query.death == "all" or u.query.death == room.process_pid.toString() or u.query.death == room.name))
+            done()
+            return
           if room.start_death()
             death_room_found = true
-        response.writeHead(200)
-        if death_room_found
-          response.end(addCallback(u.query.callback, "['death ok', '" + u.query.death + "']"))
-        else
-          response.end(addCallback(u.query.callback, "['room not found', '" + u.query.death + "']"))
+          done()
+          return
+        , () ->
+          response.writeHead(200)
+          if death_room_found
+            response.end(addCallback(u.query.callback, "['death ok', '" + u.query.death + "']"))
+          else
+            response.end(addCallback(u.query.callback, "['room not found', '" + u.query.death + "']"))
+        )
 
       else if u.query.deathcancel
         if !auth.auth(u.query.username, u.query.pass, "start_death", "cancel_death")
@@ -4141,34 +4266,35 @@ if settings.modules.http
           response.end(addCallback(u.query.callback, "['密码错误', 0]"))
           return
         death_room_found = false
-        for room in ROOM_all when room and (u.query.deathcancel == "all" or u.query.deathcancel == room.process_pid.toString() or u.query.deathcancel == room.name)
+        _async.each(rooms, (room, done)->
+          if !(room and (u.query.deathcancel == "all" or u.query.deathcancel == room.process_pid.toString() or u.query.deathcancel == room.name))
+            done()
+            return
           if room.cancel_death()
             death_room_found = true
-        response.writeHead(200)
-        if death_room_found
-          response.end(addCallback(u.query.callback, "['death cancel ok', '" + u.query.deathcancel + "']"))
-        else
-          response.end(addCallback(u.query.callback, "['room not found', '" + u.query.deathcancel + "']"))
+          done()
+        , () ->
+          response.writeHead(200)
+          if death_room_found
+            response.end(addCallback(u.query.callback, "['death cancel ok', '" + u.query.deathcancel + "']"))
+          else
+            response.end(addCallback(u.query.callback, "['room not found', '" + u.query.deathcancel + "']"))
+        )
 
       else if u.query.reboot
         if !auth.auth(u.query.username, u.query.pass, "stop", "reboot")
           response.writeHead(200)
           response.end(addCallback(u.query.callback, "['密码错误', 0]"))
           return
-        for room in ROOM_all when room
-          if room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN
-            room.scores[room.dueling_players[0].name_vpass] = 0
-            room.scores[room.dueling_players[1].name_vpass] = 0
-          room.kicked = true
-          room.send_replays()
-          room.process.kill()
-          room.delete()
-        rebooted = true
-        if windbot_process
-          windbot_process.kill()
-        response.writeHead(200)
-        response.end(addCallback(u.query.callback, "['reboot ok', '" + u.query.reboot + "']"))
-        throw "rebooted"
+        ROOM_kick("all", (err, found)->
+          global.rebooted = true
+          if windbot_process
+            windbot_process.kill()
+          response.writeHead(200)
+          response.end(addCallback(u.query.callback, "['reboot ok', '" + u.query.reboot + "']"))
+          process.exit()
+        )
+        
 
       else if u.query.generatekey and settings.modules.vip.enabled
         if !auth.auth(u.query.username, u.query.pass, "vip", "generate_keys")
