@@ -19,7 +19,7 @@
     "geoip-country-lite": "latest",
     "load-json-file": "latest",
     "moment": "latest",
-    "pg": "^6.4.2",
+    "pg": "^8.0.2",
     "redis": "latest",
     "request": "latest",
     "sqlite3": "latest",
