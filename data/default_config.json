@@ -79,11 +79,24 @@
     },
     "random_duel": {
       "enabled": true,
+      "default_type": "S",
       "no_rematch_check": false,
       "record_match_scores": false,
       "post_match_scores": false,
       "post_match_accesskey": "123456",
-      "blank_pass_match": true,
+      "blank_pass_modes": {
+        "S": true,
+        "M": true,
+        "T": false,
+        "OOR": true,
+        "TOR": true,
+        "OR": true,
+        "TR": true,
+        "OOMR": true,
+        "TOMR": true,
+        "OMR": true,
+        "TMR": true
+      },
       "ready_time": 20,
       "hang_timeout": 90
     },
