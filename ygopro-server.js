@@ -397,7 +397,15 @@
     settings.modules.random_duel.blank_pass_modes = {
       "S": true,
       "M": true,
-      "T": false
+      "T": false,
+      "OOR": true,
+      "TOR": true,
+      "OR": true,
+      "TR": true,
+      "OOMR": true,
+      "TOMR": true,
+      "OMR": true,
+      "TMR": true
     };
     delete settings.modules.random_duel.blank_pass_match;
     imported = true;
@@ -406,8 +414,16 @@
   if (settings.modules.random_duel.blank_pass_match === false) {
     settings.modules.random_duel.blank_pass_modes = {
       "S": true,
-      "M": false,
-      "T": false
+      "M": true,
+      "T": false,
+      "OOR": true,
+      "TOR": true,
+      "OR": true,
+      "TR": true,
+      "OOMR": false,
+      "TOMR": false,
+      "OMR": false,
+      "TMR": false
     };
     delete settings.modules.random_duel.blank_pass_match;
     imported = true;
@@ -995,11 +1011,7 @@
     max_player = type === 'T' ? 4 : 2;
     playerbanned = bannedplayer && bannedplayer.count > 3 && moment() < bannedplayer.time;
     result = _.find(ROOM_all, function(room) {
-<<<<<<< HEAD
-      return room && room.random_type !== '' && room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && !room.windbot && ((type === '' && room.random_type !== 'T' && ((!_.endsWith(room.random_type, "MR") && room.random_type !== 'M') || (settings.modules.random_duel.blank_pass_match && room.random_type !== 'T'))) || room.random_type === type) && room.get_playing_player().length < max_player && (settings.modules.random_duel.no_rematch_check || room.get_host() === null || room.get_host().ip !== ROOM_players_oppentlist[player_ip]) && (playerbanned === room.deprecated || type === 'T');
-=======
       return room && room.random_type !== '' && room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && !room.windbot && ((type === '' && (room.random_type === settings.modules.random_duel.default_type || settings.modules.random_duel.blank_pass_modes[room.random_type])) || room.random_type === type) && room.get_playing_player().length < max_player && (settings.modules.random_duel.no_rematch_check || room.get_host() === null || room.get_host().ip !== ROOM_players_oppentlist[player_ip]) && (playerbanned === room.deprecated || type === 'T');
->>>>>>> master
     });
     if (result) {
       result.welcome = '${random_duel_enter_room_waiting}';
