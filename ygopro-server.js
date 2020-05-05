@@ -2127,12 +2127,16 @@
       ref3 = this.players;
       for (m = 0, len2 = ref3.length; m < len2; m++) {
         player = ref3[m];
-        CLIENT_send_replays(player, this);
+        if (player) {
+          CLIENT_send_replays(player, this);
+        }
       }
       ref4 = this.watchers;
       for (n = 0, len3 = ref4.length; n < len3; n++) {
         player = ref4[n];
-        CLIENT_send_replays(player, this);
+        if (player) {
+          CLIENT_send_replays(player, this);
+        }
       }
       return true;
     }
