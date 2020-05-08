@@ -20,7 +20,7 @@
     "load-json-file": "latest",
     "lzma": "^2.3.2",
     "moment": "latest",
-    "pg": "^6.4.2",
+    "pg": "^8.1.0",
     "redis": "latest",
     "request": "latest",
     "sqlite3": "latest",
