@@ -637,6 +637,7 @@
         if (this.resolved) {
           return false;
         }
+        this.resolved = true;
         this.func(err, data);
         return true;
       }

@@ -495,6 +495,7 @@ class ResolveData
   resolve: (err, data) ->
     if @resolved
       return false
+    @resolved = true
     @func(err, data)
     return true
 
