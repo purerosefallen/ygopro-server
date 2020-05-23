@@ -3620,11 +3620,11 @@
     });
   };
 
-  if (settings.modules.dialogues.get) {
+  if (settings.modules.dialogues.enabled && settings.modules.dialogues.get) {
     load_dialogues();
   }
 
-  if (settings.modules.dialogues.get_custom) {
+  if (settings.modules.dialogues.enabled && settings.modules.dialogues.get_custom) {
     load_dialogues_custom();
   }
 
@@ -4372,11 +4372,11 @@
     });
   };
 
-  if (settings.modules.tips.get) {
+  if (settings.modules.tips.enabled && settings.modules.tips.get) {
     load_tips();
   }
 
-  if (settings.modules.tips.get_zh) {
+  if (settings.modules.tips.enabled && settings.modules.tips.get_zh) {
     load_tips_zh();
   }
 

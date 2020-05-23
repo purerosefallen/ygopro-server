@@ -2771,10 +2771,10 @@ load_dialogues_custom = global.load_dialogues_custom = (callback) ->
     return
   return
 
-if settings.modules.dialogues.get
+if settings.modules.dialogues.enabled and settings.modules.dialogues.get
   load_dialogues()
 
-if settings.modules.dialogues.get_custom
+if settings.modules.dialogues.enabled and settings.modules.dialogues.get_custom
   load_dialogues_custom()
 
 ygopro.stoc_follow 'GAME_MSG', true, (buffer, info, client, server, datas)->
@@ -3286,9 +3286,9 @@ load_tips_zh = global.load_tips_zh = (callback)->
     return
   return
 
-if settings.modules.tips.get
+if settings.modules.tips.enabled and settings.modules.tips.get
   load_tips()
-if settings.modules.tips.get_zh
+if settings.modules.tips.enabled and settings.modules.tips.get_zh
   load_tips_zh()
 if settings.modules.tips.enabled
   setInterval ()->
