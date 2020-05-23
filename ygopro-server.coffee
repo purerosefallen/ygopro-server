@@ -248,10 +248,15 @@ concat_name = global.concat_name = (name, num) ->
 
 # 读取配置
 default_config = loadJSON('./data/default_config.json')
-try
-  config = loadJSON('./config/config.json')
-catch
+if fs.existsSync('./config/config.json')
+  try
+    config = loadJSON('./config/config.json')
+  catch e
+    console.error("Failed reading config: ", e.toString())
+    process.exit(1)
+else
   config = {}
+
 settings = global.settings = merge(default_config, config, { arrayMerge: (destination, source) -> source })
 
 auth = global.auth = require './ygopro-auth.js'
