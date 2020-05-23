@@ -3607,7 +3607,6 @@
     });
   };
 
-<<<<<<< HEAD
   load_dialogues_custom = global.load_dialogues_custom = function(callback) {
     request({
       url: settings.modules.dialogues.get_custom,
@@ -3628,9 +3627,6 @@
   };
 
   if (settings.modules.dialogues.enabled && settings.modules.dialogues.get) {
-=======
-  if (settings.modules.dialogues.get) {
->>>>>>> mc
     load_dialogues();
   }
 
@@ -4363,7 +4359,6 @@
     });
   };
 
-<<<<<<< HEAD
   load_tips_zh = global.load_tips_zh = function(callback) {
     request({
       url: settings.modules.tips.get_zh,
@@ -4384,9 +4379,6 @@
   };
 
   if (settings.modules.tips.enabled && settings.modules.tips.get) {
-=======
-  if (settings.modules.tips.get) {
->>>>>>> mc
     load_tips();
   }
 
