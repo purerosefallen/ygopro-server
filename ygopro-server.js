@@ -2674,7 +2674,7 @@
 
   // 功能模块
   // return true to cancel a synchronous message
-  ygopro.ctos_follow('PLAYER_INFO', true, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('PLAYER_INFO', true, async function(buffer, info, client, server, datas) {
     var geo, lang, name, name_full, struct, vpass;
     // checkmate use username$password, but here don't
     // so remove the password
@@ -2745,7 +2745,7 @@
     return false;
   });
 
-  ygopro.ctos_follow('JOIN_GAME', false, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('JOIN_GAME', false, async function(buffer, info, client, server, datas) {
     var available_logs, check_buffer_indentity, create_room_with_action, len3, len4, len5, len6, line, n, name, o, p, pre_room, q, recover_match, ref4, ref5, ref6, ref7, replay_id, room;
     //log.info info
     info.pass = info.pass.trim();
@@ -3343,7 +3343,7 @@
     }
   });
 
-  ygopro.stoc_follow('JOIN_GAME', false, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('JOIN_GAME', false, async function(buffer, info, client, server, datas) {
     var len3, len4, len5, line, n, o, p, player, recorder, ref4, ref5, ref6, room, watcher;
     //欢迎信息
     room = ROOM_all[client.rid];
@@ -3479,7 +3479,7 @@
     load_words();
   }
 
-  load_dialogues = global.load_dialogues = function(callback) {
+  load_dialogues = global.load_dialogues = async function(callback) {
     request({
       url: settings.modules.dialogues.get,
       json: true
@@ -3525,7 +3525,7 @@
     load_dialogues_custom();
   }
 
-  ygopro.stoc_follow('GAME_MSG', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('GAME_MSG', true, async function(buffer, info, client, server, datas) {
     var act_pos, card, chain, check, count, cpos, deck_found, found, hint_type, i, id, len10, len11, len3, len4, len5, len6, len7, len8, len9, limbo_found, line, loc, max_loop, msg, n, o, oppo_pos, p, phase, player, playertype, pos, ppos, q, r, r_player, reason, ref10, ref11, ref12, ref13, ref14, ref4, ref5, ref6, ref7, ref8, ref9, room, s, t, trigger_location, val, win_pos, x, y, z;
     room = ROOM_all[client.rid];
     if (!(room && !client.reconnecting)) {
@@ -3944,7 +3944,7 @@
   });
 
   //房间管理
-  ygopro.ctos_follow('HS_TOOBSERVER', true, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('HS_TOOBSERVER', true, async function(buffer, info, client, server, datas) {
     var len3, n, player, ref4, room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -3968,7 +3968,7 @@
     return false;
   });
 
-  ygopro.ctos_follow('HS_KICK', true, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('HS_KICK', true, async function(buffer, info, client, server, datas) {
     var len3, n, player, ref4, room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -3996,7 +3996,7 @@
     return false;
   });
 
-  ygopro.stoc_follow('TYPE_CHANGE', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('TYPE_CHANGE', true, async function(buffer, info, client, server, datas) {
     var is_host, selftype;
     selftype = info.type & 0xf;
     is_host = ((info.type >> 4) & 0xf) !== 0;
@@ -4009,7 +4009,7 @@
     return false;
   });
 
-  ygopro.stoc_follow('HS_PLAYER_ENTER', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('HS_PLAYER_ENTER', true, async function(buffer, info, client, server, datas) {
     var pos, room, struct;
     room = ROOM_all[client.rid];
     if (!(room && settings.modules.hide_name && room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN)) {
@@ -4025,7 +4025,7 @@
     return false;
   });
 
-  ygopro.stoc_follow('HS_PLAYER_CHANGE', false, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('HS_PLAYER_CHANGE', false, async function(buffer, info, client, server, datas) {
     var is_ready, len3, len4, n, o, p1, p2, player, pos, ref4, ref5, room;
     room = ROOM_all[client.rid];
     if (!(room && room.max_player && client.is_host)) {
@@ -4096,11 +4096,11 @@
     }
   });
 
-  ygopro.ctos_follow('REQUEST_FIELD', true, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('REQUEST_FIELD', true, async function(buffer, info, client, server, datas) {
     return true;
   });
 
-  ygopro.stoc_follow('FIELD_FINISH', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('FIELD_FINISH', true, async function(buffer, info, client, server, datas) {
     var room;
     room = ROOM_all[client.rid];
     if (!(room && settings.modules.reconnect.enabled)) {
@@ -4118,8 +4118,8 @@
     return true;
   });
 
-  ygopro.stoc_follow('DUEL_END', false, function(buffer, info, client, server, datas) {
-    var len3, len4, n, o, player, ref4, ref5, results, room;
+  ygopro.stoc_follow('DUEL_END', false, async function(buffer, info, client, server, datas) {
+    var len3, len4, n, o, player, ref4, ref5, room;
     room = ROOM_all[client.rid];
     if (!(room && settings.modules.replay_delay && room.hostinfo.mode === 1)) {
       return;
@@ -4136,18 +4136,16 @@
         }
       }
       ref5 = room.watchers;
-      results = [];
       for (o = 0, len4 = ref5.length; o < len4; o++) {
         player = ref5[o];
         if (player) {
-          results.push(CLIENT_send_replays(player, room));
+          CLIENT_send_replays(player, room);
         }
       }
-      return results;
     }
   });
 
-  wait_room_start = function(room, time) {
+  wait_room_start = async function(room, time) {
     var len3, n, player, ref4;
     if (room && room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && room.ready_player_count_without_host >= room.max_player - 1) {
       time -= 1;
@@ -4172,7 +4170,7 @@
     }
   };
 
-  wait_room_start_arena = function(room) {
+  wait_room_start_arena = async function(room) {
     var display_name, len3, n, player, ref4;
     if (room && room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && room.waiting_for_player) {
       room.waiting_for_player_time = room.waiting_for_player_time - 1;
@@ -4200,7 +4198,7 @@
   };
 
   //tip
-  ygopro.stoc_send_random_tip = function(client) {
+  ygopro.stoc_send_random_tip = async function(client) {
     var tip_type;
     tip_type = "tips";
     if (settings.modules.tips.split_zh && tips.tips_zh.length && client.lang === "zh-cn") {
@@ -4211,7 +4209,7 @@
     }
   };
 
-  ygopro.stoc_send_random_tip_to_room = function(room) {
+  ygopro.stoc_send_random_tip_to_room = async function(room) {
     var len3, len4, n, o, player, ref4, ref5;
     if (settings.modules.tips.enabled && tips.tips.length) {
       ref4 = room.players;
@@ -4231,7 +4229,7 @@
     }
   };
 
-  load_tips = global.load_tips = function(callback) {
+  load_tips = global.load_tips = async function(callback) {
     request({
       url: settings.modules.tips.get,
       json: true
@@ -4250,7 +4248,7 @@
     });
   };
 
-  load_tips_zh = global.load_tips_zh = function(callback) {
+  load_tips_zh = global.load_tips_zh = async function(callback) {
     request({
       url: settings.modules.tips.get_zh,
       json: true
@@ -4291,7 +4289,7 @@
     }, 30000);
   }
 
-  ygopro.stoc_follow('DUEL_START', false, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('DUEL_START', false, async function(buffer, info, client, server, datas) {
     var deck_arena, deck_name, deck_text, len3, len4, n, o, player, ref4, ref5, room;
     room = ROOM_all[client.rid];
     if (!(room && !client.reconnecting)) {
@@ -4407,7 +4405,7 @@
     }
   });
 
-  ygopro.ctos_follow('SURRENDER', true, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('SURRENDER', true, async function(buffer, info, client, server, datas) {
     var room, sur_player;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -4434,7 +4432,7 @@
     return false;
   });
 
-  report_to_big_brother = global.report_to_big_brother = function(roomname, sender, ip, level, content, match) {
+  report_to_big_brother = global.report_to_big_brother = async function(roomname, sender, ip, level, content, match) {
     if (!settings.modules.big_brother.enabled) {
       return;
     }
@@ -4462,7 +4460,7 @@
 
   //else
   //log.info 'BIG BROTHER OK', response.statusCode, roomname, body
-  ygopro.ctos_follow('CHAT', true, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('CHAT', true, async function(buffer, info, client, server, datas) {
     var buy_result, cancel, ccolor, cip, cmd, cmsg, cname, code, color, cvalue, key, msg, name, oldmsg, ref4, room, struct, sur_player, uname, windbot, word;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -4804,7 +4802,7 @@
     return cancel;
   });
 
-  ygopro.ctos_follow('UPDATE_DECK', true, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('UPDATE_DECK', true, async function(buffer, info, client, server, datas) {
     var buff_main, buff_side, card, current_deck, deck, deck_array, deck_main, deck_side, deck_text, deckbuf, decks, found_deck, i, len3, len4, line, n, o, oppo_pos, recover_player_data, room, struct, win_pos;
     if (settings.modules.reconnect.enabled && client.pre_reconnecting) {
       if (!CLIENT_is_able_to_reconnect(client) && !CLIENT_is_able_to_kick_reconnect(client)) {
@@ -4951,7 +4949,7 @@
     return false;
   });
 
-  ygopro.ctos_follow('RESPONSE', false, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('RESPONSE', false, async function(buffer, info, client, server, datas) {
     var room;
     room = ROOM_all[client.rid];
     if (!(room && (room.random_type || room.arena))) {
@@ -4960,7 +4958,7 @@
     room.last_active_time = moment();
   });
 
-  ygopro.stoc_follow('TIME_LIMIT', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('TIME_LIMIT', true, async function(buffer, info, client, server, datas) {
     var check, cur_players, room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -5017,7 +5015,7 @@
     return false;
   });
 
-  ygopro.ctos_follow('TIME_CONFIRM', false, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('TIME_CONFIRM', false, async function(buffer, info, client, server, datas) {
     var room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -5045,7 +5043,7 @@
     }
   });
 
-  ygopro.ctos_follow('HAND_RESULT', false, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('HAND_RESULT', false, async function(buffer, info, client, server, datas) {
     var room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -5060,7 +5058,7 @@
     }
   });
 
-  ygopro.ctos_follow('TP_RESULT', false, function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('TP_RESULT', false, async function(buffer, info, client, server, datas) {
     var room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -5074,7 +5072,7 @@
     room.last_active_time = moment();
   });
 
-  ygopro.stoc_follow('CHAT', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('CHAT', true, async function(buffer, info, client, server, datas) {
     var len3, n, pid, player, ref4, room, tcolor, tplayer;
     room = ROOM_all[client.rid];
     pid = info.player;
@@ -5113,7 +5111,7 @@
     }
   });
 
-  ygopro.stoc_follow('SELECT_HAND', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('SELECT_HAND', true, async function(buffer, info, client, server, datas) {
     var room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -5141,7 +5139,7 @@
     return false;
   });
 
-  ygopro.stoc_follow('HAND_RESULT', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('HAND_RESULT', true, async function(buffer, info, client, server, datas) {
     var room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -5150,7 +5148,7 @@
     return room.determine_firstgo;
   });
 
-  ygopro.stoc_follow('SELECT_TP', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('SELECT_TP', true, async function(buffer, info, client, server, datas) {
     var room;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -5173,7 +5171,7 @@
     return false;
   });
 
-  ygopro.stoc_follow('CHANGE_SIDE', false, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('CHANGE_SIDE', false, async function(buffer, info, client, server, datas) {
     var room, room_name, sinterval, temp_log;
     room = ROOM_all[client.rid];
     if (!room) {
@@ -5232,7 +5230,7 @@
     }
   });
 
-  ygopro.stoc_follow('REPLAY', true, function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('REPLAY', true, async function(buffer, info, client, server, datas) {
     var duellog, dueltime, i, len3, len4, n, o, player, ref4, ref5, replay_filename, room;
     room = ROOM_all[client.rid];
     if (!room) {
