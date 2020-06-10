@@ -2700,7 +2700,7 @@
     }, name)) {
       client.rag = true;
     }
-    if (settings.modules.mycard.enabled && settings.modules.mycard.ban_get) {
+    if (settings.modules.mycard.enabled && settings.modules.mycard.ban_get && !client.is_local) {
       try {
         banMCRequest = (await axios.get(settings.modules.mycard.ban_get, {
           paramsSerializer: qs.stringify,
@@ -2748,7 +2748,7 @@
     return false;
   });
 
-  ygopro.ctos_follow('JOIN_GAME', false, async function(buffer, info, client, server, datas) {
+  ygopro.ctos_follow('JOIN_GAME', true, async function(buffer, info, client, server, datas) {
     var available_logs, check_buffer_indentity, create_room_with_action, len3, len4, len5, len6, line, n, name, o, p, pre_room, q, recover_match, ref4, ref5, ref6, ref7, replay_id, room;
     //log.info info
     info.pass = info.pass.trim();

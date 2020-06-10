@@ -2011,7 +2011,7 @@ ygopro.ctos_follow 'PLAYER_INFO', true, (buffer, info, client, server, datas)->
     return false
   , name))
     client.rag = true
-  if settings.modules.mycard.enabled and settings.modules.mycard.ban_get
+  if settings.modules.mycard.enabled and settings.modules.mycard.ban_get and !client.is_local
     try
       banMCRequest = await axios.get settings.modules.mycard.ban_get, 
         paramsSerializer: qs.stringify
@@ -2049,7 +2049,7 @@ ygopro.ctos_follow 'PLAYER_INFO', true, (buffer, info, client, server, datas)->
         client.lang=settings.modules.i18n.fallback
   await return false
 
-ygopro.ctos_follow 'JOIN_GAME', false, (buffer, info, client, server, datas)->
+ygopro.ctos_follow 'JOIN_GAME', true, (buffer, info, client, server, datas)->
 #log.info info
   info.pass=info.pass.trim()
   client.pass = info.pass
