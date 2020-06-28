@@ -4028,10 +4028,10 @@
     return false;
   });
 
-  ygopro.stoc_follow('HS_PLAYER_CHANGE', false, async function(buffer, info, client, server, datas) {
+  ygopro.stoc_follow('HS_PLAYER_CHANGE', true, async function(buffer, info, client, server, datas) {
     var is_ready, len3, len4, n, o, p1, p2, player, pos, ref4, ref5, room;
     room = ROOM_all[client.rid];
-    if (!(room && room.max_player && client.is_host)) {
+    if (!(room && room.max_player && client.pos === 0)) {
       return;
     }
     pos = info.status >> 4;
