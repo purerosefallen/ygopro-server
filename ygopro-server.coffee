@@ -452,6 +452,10 @@ if settings.modules.heartbeat_detection.enabled
 if settings.modules.tournament_mode.enable_recover
   ReplayParser = global.ReplayParser = require "./Replay.js"
 
+if settings.modules.athletic_check.enabled
+  AthleticChecker = require("./athletic-check.js").AthleticChecker
+  athleticChecker = global.athleticChecker = new AthleticChecker(settings.modules.athletic_check)
+
 # 组件
 ygopro = global.ygopro = require './ygopro.js'
 roomlist = global.roomlist = require './roomlist.js' if settings.modules.http.websocket_roomlist
@@ -1702,7 +1706,7 @@ class Room
         else
           for player in @players when player.pos != 7
             @scores[player.name_vpass] = -5
-          if @players.length == 2
+          if @players.length == 2 and !client.arena_quit_free
             @scores[client.name_vpass] = -9
         @arena_score_handled = true
       index = _.indexOf(@players, client)
@@ -1795,6 +1799,20 @@ class Room
       for player in @get_playing_player()
         for buffer in @recover_buffers[player.pos]
           ygopro.stoc_send(player, "GAME_MSG", buffer)
+
+  check_athletic: ->
+    players = @get_playing_player()
+    room = this
+    await Promise.all(players.map((player) ->
+      main = _.clone(player.main)
+      side = _.clone(player.side)
+      using_athletic = await athleticChecker.checkAthletic({main: main, side: side})
+      if !using_athletic.success
+        log.warn("GET ATHLETIC FAIL", player.name, using_athletic.message)
+      else if using_athletic.athletic
+        ygopro.stoc_send_chat_to_room(room, "#{player.name}${using_athletic_deck}", ygopro.constants.COLORS.BABYBLUE)
+    ))
+    await return
 
 # 网络连接
 net.createServer (client) ->
@@ -2124,7 +2142,7 @@ ygopro.ctos_follow 'JOIN_GAME', true, (buffer, info, client, server, datas)->
     replay_id=Cloud_replay_ids[Math.floor(Math.random()*Cloud_replay_ids.length)]
     redisdb.hgetall "replay:"+replay_id, client.open_cloud_replay
 
-  else if info.version != settings.version # and (info.version < 9020 or settings.version != 4927) #强行兼容23333版
+  else if info.version != settings.version and !settings.alternative_versions.includes(info.version)
     ygopro.stoc_send_chat(client, settings.modules.update, ygopro.constants.COLORS.RED)
     ygopro.stoc_send client, 'ERROR_MSG', {
       msg: 4
@@ -2141,12 +2159,12 @@ ygopro.ctos_follow 'JOIN_GAME', true, (buffer, info, client, server, datas)->
       ygopro.stoc_die(client, '${invalid_password_length}')
       return
 
-    #if info.version >= 9020 and settings.version == 4927 #强行兼容23333版
-    #  info.version = settings.version
-    #  struct = ygopro.structs.get("CTOS_JoinGame")
-    #  struct._setBuff(buffer)
-    #  struct.set("version", info.version)
-    #  buffer = struct.buffer
+    if info.version != settings.version and settings.alternative_versions.includes(info.version)
+      info.version = settings.version
+      struct = ygopro.structs.get("CTOS_JoinGame")
+      struct._setBuff(buffer)
+      struct.set("version", info.version)
+      buffer = struct.buffer
 
     buffer = Buffer.from(info.pass[0...8], 'base64')
 
@@ -2372,6 +2390,12 @@ ygopro.ctos_follow 'JOIN_GAME', true, (buffer, info, client, server, datas)->
 
 
   else if settings.modules.challonge.enabled
+    if info.version != settings.version and settings.alternative_versions.includes(info.version)
+      info.version = settings.version
+      struct = ygopro.structs.get("CTOS_JoinGame")
+      struct._setBuff(buffer)
+      struct.set("version", info.version)
+      buffer = struct.buffer
     pre_room = ROOM_find_by_name(info.pass)
     if pre_room and pre_room.duel_stage != ygopro.constants.DUEL_STAGE.BEGIN and settings.modules.cloud_replay.enable_halfway_watch and !pre_room.hostinfo.no_watch
       room = pre_room
@@ -2514,13 +2538,12 @@ ygopro.ctos_follow 'JOIN_GAME', true, (buffer, info, client, server, datas)->
     ygopro.stoc_die(client, "${invalid_password_room}")
 
   else
-    #if info.version >= 9020 and settings.version == 4927 #强行兼容23333版
-    #  info.version = settings.version
-    #  struct = ygopro.structs.get("CTOS_JoinGame")
-    #  struct._setBuff(buffer)
-    #  struct.set("version", info.version)
-    #  buffer = struct.buffer
-    #  #ygopro.stoc_send_chat(client, "看起来你是YGOMobile的用户，请记得更新先行卡补丁，否则会看到白卡", ygopro.constants.COLORS.GREEN)
+    if info.version != settings.version and settings.alternative_versions.includes(info.version)
+      info.version = settings.version
+      struct = ygopro.structs.get("CTOS_JoinGame")
+      struct._setBuff(buffer)
+      struct.set("version", info.version)
+      buffer = struct.buffer
 
     #log.info 'join_game',info.pass, client.name
     room = ROOM_find_or_create_by_name(info.pass, client.ip)
@@ -3055,15 +3078,24 @@ ygopro.stoc_follow 'HS_PLAYER_ENTER', true, (buffer, info, client, server, datas
 
 ygopro.stoc_follow 'HS_PLAYER_CHANGE', true, (buffer, info, client, server, datas)->
   room=ROOM_all[client.rid]
-  return unless room and room.max_player and client.pos == 0
+  return unless room and client.pos == 0
   pos = info.status >> 4
   is_ready = (info.status & 0xf) == 9
-  if pos < room.max_player
-    if room.arena
-      room.ready_player_count = 0
-      for player in room.players
-        if player.pos == pos
-          player.is_ready = is_ready
+  room.ready_player_count = 0
+  room.ready_player_count_without_host = 0
+  for player in room.players
+    if player.pos == pos
+      player.is_ready = is_ready
+    if player.is_ready
+      ++room.ready_player_count
+      unless player.is_host
+        ++room.ready_player_count_without_host
+  if settings.modules.athletic_check.enabled
+    possibly_max_player = if room.hostinfo.mode == 2 then 4 else 2
+    if room.ready_player_count >= possibly_max_player
+      room.check_athletic()
+  if room.max_player and pos < room.max_player
+    if room.arena # mycard
       p1 = room.players[0]
       p2 = room.players[1]
       if !p1 or !p2
@@ -3087,13 +3119,7 @@ ygopro.stoc_follow 'HS_PLAYER_CHANGE', true, (buffer, info, client, server, data
         clearInterval room.waiting_for_player_interval
         room.waiting_for_player_interval = null
         room.waiting_for_player_time = settings.modules.arena_mode.ready_time
-    else
-      room.ready_player_count_without_host = 0
-      for player in room.players
-        if player.pos == pos
-          player.is_ready = is_ready
-        unless player.is_host
-          room.ready_player_count_without_host += player.is_ready
+    else # random duel
       if room.ready_player_count_without_host >= room.max_player - 1
         #log.info "all ready"
         setTimeout (()-> wait_room_start(ROOM_all[client.rid], settings.modules.random_duel.ready_time);return), 1000
@@ -4001,7 +4027,7 @@ if settings.modules.mycard.enabled
       return
     )
     
-    if settings.modules.arena_mode.punish_quit_before_match
+    if true # settings.modules.arena_mode.punish_quit_before_match
       _async.each(ROOM_all, (room, done) ->
         if not (room and room.arena and room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and room.get_playing_player().length < 2)
           done()
