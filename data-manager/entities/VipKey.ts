@@ -1,8 +1,9 @@
 import {Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn} from "typeorm";
 import {User} from "./User";
+import {CreateAndUpdateTimeBase} from "./CreateAndUpdateTimeBase";
 
 @Entity()
-export class VipKey {
+export class VipKey extends CreateAndUpdateTimeBase {
     @PrimaryGeneratedColumn({unsigned: true, type: "bigint"})
     id: number;
 

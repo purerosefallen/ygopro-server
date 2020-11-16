@@ -2,9 +2,10 @@ import {Column, Entity, Index, OneToMany, PrimaryColumn} from "typeorm";
 import {UserDialog} from "./UserDialog";
 import {VipKey} from "./VipKey";
 import moment from "moment";
+import {CreateAndUpdateTimeBase} from "./CreateAndUpdateTimeBase";
 
 @Entity()
-export class User {
+export class User extends CreateAndUpdateTimeBase {
     @PrimaryColumn({type: "varchar", length: 128})
     key: string;
 

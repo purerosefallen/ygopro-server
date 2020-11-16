@@ -12,7 +12,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.VipKey = void 0;
 const typeorm_1 = require("typeorm");
 const User_1 = require("./User");
-let VipKey = class VipKey {
+const CreateAndUpdateTimeBase_1 = require("./CreateAndUpdateTimeBase");
+let VipKey = class VipKey extends CreateAndUpdateTimeBase_1.CreateAndUpdateTimeBase {
     toJSON() {
         return { key: this.key, type: this.type };
     }

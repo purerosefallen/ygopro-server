@@ -17,7 +17,8 @@ const typeorm_1 = require("typeorm");
 const UserDialog_1 = require("./UserDialog");
 const VipKey_1 = require("./VipKey");
 const moment_1 = __importDefault(require("moment"));
-let User = class User {
+const CreateAndUpdateTimeBase_1 = require("./CreateAndUpdateTimeBase");
+let User = class User extends CreateAndUpdateTimeBase_1.CreateAndUpdateTimeBase {
     isVip() {
         return this.vipExpireDate && moment_1.default().isBefore(this.vipExpireDate);
     }
