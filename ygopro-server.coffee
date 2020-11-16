@@ -4281,7 +4281,3 @@ if true
     return
 
 init()
-process.on 'SIGINT', ()->
-  if this.dataManager
-    await this.dataManager.finialize()
-    process.exit(0)
