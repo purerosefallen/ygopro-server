@@ -12,6 +12,7 @@ import {DuelLogPlayer} from "./entities/DuelLogPlayer";
 import {User} from "./entities/User";
 import {VipKey} from "./entities/VipKey";
 import {UserDialog} from "./entities/UserDialog";
+import {RandomDuelScore} from "./entities/RandomDuelScore";
 
 interface BasePlayerInfo {
 	name: string;
@@ -542,10 +543,10 @@ export class DataManager {
 			try {
 				const vipKeyList = vipInfo.cdkeys;
 				const newKeys: VipKey[] = [];
-				for(let keyTypeString in vipKeyList) {
+				for (let keyTypeString in vipKeyList) {
 					const keyType = parseInt(keyTypeString);
 					const keysTexts: string[] = vipKeyList[keyTypeString];
-					for(let keyText of keysTexts) {
+					for (let keyText of keysTexts) {
 						const newKey = new VipKey()
 						newKey.type = keyType;
 						newKey.key = keyText;
@@ -553,14 +554,14 @@ export class DataManager {
 					}
 				}
 				await mdb.save(newKeys);
-				for(let vipUserName in vipInfo.players) {
+				for (let vipUserName in vipInfo.players) {
 					const oldVipUserInfo = vipInfo.players[vipUserName];
 					const userKey = vipUserName + '$' + oldVipUserInfo.password;
 					let user = await mdb.findOne(User, userKey);
-					if(user && user.isVip()) {
+					if (user && user.isVip()) {
 						continue;
 					}
-					if(!user) {
+					if (!user) {
 						user = new User();
 						user.key = userKey;
 					}
@@ -569,7 +570,7 @@ export class DataManager {
 					user.words = oldVipUserInfo.words || null;
 					user = await mdb.save(user);
 					const newDialogues: UserDialog[] = [];
-					for(let dialogueCardCodeText in oldVipUserInfo.dialogues) {
+					for (let dialogueCardCodeText in oldVipUserInfo.dialogues) {
 						const cardCode = parseInt(dialogueCardCodeText);
 						const dialogueText = oldVipUserInfo.dialogues[dialogueCardCodeText];
 						const dialogue = new UserDialog();
@@ -586,5 +587,75 @@ export class DataManager {
 				return false;
 			}
 		});
+	}
+	async getRandomDuelScore(name: string) {
+		const repo = this.db.getRepository(RandomDuelScore);
+		try {
+			const score = await repo.findOne(name);
+			return score;
+		} catch (e) {
+			this.log.warn(`Failed to fetch random duel score ${name}: ${e.toString()}`);
+			return null;
+		}
+	}
+	async saveRandomDuelScore(score: RandomDuelScore) {
+		const repo = this.db.getRepository(RandomDuelScore);
+		try {
+			return await repo.save(score);
+		} catch (e) {
+			this.log.warn(`Failed to save random duel score: ${e.toString()}`);
+			return null;
+		}
+	}
+	async getOrCreateRandomDuelScore(name: string) {
+		const score = await this.getRandomDuelScore(name);
+		if(score) {
+			return score;
+		}
+		const newScore = new RandomDuelScore();
+		newScore.name = name;
+		return await this.saveRandomDuelScore(newScore);
+	}
+	async getRandomDuelScoreDisplay(name: string) {
+		const score = await this.getRandomDuelScore(name);
+		if(!score) {
+			return `${name.split("$")[0]} \${random_score_blank}`;
+		}
+		return score.getScoreText();
+	}
+	async randomDuelPlayerWin(name: string) {
+		const score = await this.getOrCreateRandomDuelScore(name);
+		score.win();
+		await this.saveRandomDuelScore(score);
+	}
+	async randomDuelPlayerLose(name: string) {
+		const score = await this.getOrCreateRandomDuelScore(name);
+		score.lose();
+		await this.saveRandomDuelScore(score);
+	}
+	async randomDuelPlayerFlee(name: string) {
+		const score = await this.getOrCreateRandomDuelScore(name);
+		score.flee();
+		await this.saveRandomDuelScore(score);
+	}
+	async getRandomScoreTop10() {
+		try {
+			const scores = await this.db.getRepository(RandomDuelScore)
+				.createQueryBuilder("score")
+				.orderBy("score.win", "DESC")
+				.addOrderBy("score.lose", "ASC")
+				.addOrderBy("score.flee", "ASC")
+				.limit(10)
+				.getMany();
+			return scores.map(score => [score.getDisplayName(), {
+				win: score.winCount,
+				lose: score.loseCount,
+				flee: score.fleeCount,
+				combo: score.winCombo
+			}]);
+		} catch (e) {
+			this.log.warn(`Failed to fetch random duel score ${name}: ${e.toString()}`);
+			return [];
+		}
 	}
 }
