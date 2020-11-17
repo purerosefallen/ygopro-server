@@ -1,4 +1,23 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -17,6 +36,8 @@ const User_1 = require("./entities/User");
 const VipKey_1 = require("./entities/VipKey");
 const UserDialog_1 = require("./entities/UserDialog");
 const RandomDuelScore_1 = require("./entities/RandomDuelScore");
+const jszip_1 = __importDefault(require("jszip"));
+const fs = __importStar(require("fs"));
 class DataManager {
     constructor(config, log) {
         this.config = config;
@@ -232,6 +253,51 @@ class DataManager {
             return [];
         }
     }
+    getEscapedString(text) {
+        return text.replace(/\\/g, "").replace(/_/g, "\\_").replace(/%/g, "\\%") + "%";
+    }
+    async getDuelLogFromCondition(data) {
+        //console.log(data);
+        if (!data) {
+            return this.getAllDuelLogs();
+        }
+        const { roomName, duelCount, playerName, playerScore } = data;
+        const repo = this.db.getRepository(DuelLog_1.DuelLog);
+        try {
+            const queryBuilder = repo.createQueryBuilder("duelLog")
+                .where("1");
+            if (roomName != null && roomName.length) {
+                const escapedRoomName = this.getEscapedString(roomName);
+                queryBuilder.andWhere("duelLog.name like :escapedRoomName", { escapedRoomName });
+            }
+            if (duelCount != null && !isNaN(duelCount)) {
+                queryBuilder.andWhere("duelLog.duelCount = :duelCount", { duelCount });
+            }
+            if (playerName != null && playerName.length || playerScore != null && !isNaN(playerScore)) {
+                let innerQuery = "select id from duel_log_player where duel_log_player.duelLogId = duelLog.id";
+                const innerQueryParams = {};
+                if (playerName != null && playerName.length) {
+                    const escapedPlayerName = this.getEscapedString(playerName);
+                    innerQuery += " and duel_log_player.realName like :escapedPlayerName";
+                    innerQueryParams.escapedPlayerName = escapedPlayerName;
+                }
+                if (playerScore != null && !isNaN(playerScore)) {
+                    innerQuery += " and duel_log_player.score = :playerScore";
+                    innerQueryParams.playerScore = playerScore;
+                }
+                queryBuilder.andWhere(`exists (${innerQuery})`, innerQueryParams);
+            }
+            queryBuilder.orderBy("duelLog.id", "DESC")
+                .leftJoinAndSelect("duelLog.players", "player");
+            // console.log(queryBuilder.getSql());
+            const duelLogs = await queryBuilder.getMany();
+            return duelLogs;
+        }
+        catch (e) {
+            this.log.warn(`Failed to fetch duel logs: ${e.toString()}`);
+            return [];
+        }
+    }
     async getDuelLogFromId(id) {
         const repo = this.db.getRepository(DuelLog_1.DuelLog);
         try {
@@ -263,9 +329,47 @@ class DataManager {
         const allDuelLogs = await this.getAllDuelLogs();
         return allDuelLogs.map(duelLog => duelLog.getViewJSON(tournamentModeSettings));
     }
+    async getDuelLogJSONFromCondition(tournamentModeSettings, data) {
+        const allDuelLogs = await this.getDuelLogFromCondition(data);
+        return allDuelLogs.map(duelLog => duelLog.getViewJSON(tournamentModeSettings));
+    }
     async getAllReplayFilenames() {
         const allDuelLogs = await this.getAllDuelLogs();
         return allDuelLogs.map(duelLog => duelLog.replayFileName);
+    }
+    async getReplayFilenamesFromCondition(data) {
+        const allDuelLogs = await this.getDuelLogFromCondition(data);
+        return allDuelLogs.map(duelLog => duelLog.replayFileName);
+    }
+    async getReplayArchiveStreamFromCondition(rootPath, data) {
+        const filenames = await this.getReplayFilenamesFromCondition(data);
+        if (!filenames.length) {
+            return null;
+        }
+        try {
+            const zip = new jszip_1.default();
+            for (let fileName of filenames) {
+                const filePath = `${rootPath}${fileName}`;
+                try {
+                    await fs.promises.access(filePath);
+                    zip.file(fileName, fs.promises.readFile(filePath));
+                }
+                catch (e) {
+                    this.log.warn(`Errored archiving ${filePath}: ${e.toString()}`);
+                    continue;
+                }
+            }
+            return zip.generateNodeStream({
+                compression: "DEFLATE",
+                compressionOptions: {
+                    level: 9
+                }
+            });
+        }
+        catch (e2) {
+            this.log.warn(`Errored creating archive: ${e2.toString()}`);
+            return null;
+        }
     }
     async clearDuelLog() {
         const runner = this.db.createQueryRunner();

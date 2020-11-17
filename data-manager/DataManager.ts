@@ -13,6 +13,8 @@ import {User} from "./entities/User";
 import {VipKey} from "./entities/VipKey";
 import {UserDialog} from "./entities/UserDialog";
 import {RandomDuelScore} from "./entities/RandomDuelScore";
+import JSZip from "jszip";
+import * as fs from "fs";
 
 interface BasePlayerInfo {
 	name: string;
@@ -34,6 +36,8 @@ export interface DuelLogPlayerInfo extends BasePlayerInfo {
 	lp: number;
 	cardCount: number;
 }
+
+export interface DuelLogQuery {roomName: string, duelCount: number, playerName: string, playerScore: number}
 
 
 export class DataManager {
@@ -256,6 +260,52 @@ export class DataManager {
 
 	}
 
+	private getEscapedString(text: string) {
+		return text.replace(/\\/g, "").replace(/_/g, "\\_").replace(/%/g, "\\%") + "%";
+	}
+
+	async getDuelLogFromCondition(data: DuelLogQuery) {
+		//console.log(data);
+		if(!data) {
+			return this.getAllDuelLogs();
+		}
+		const {roomName, duelCount, playerName, playerScore} = data;
+		const repo = this.db.getRepository(DuelLog);
+		try {
+			const queryBuilder = repo.createQueryBuilder("duelLog")
+				.where("1");
+			if(roomName != null && roomName.length) {
+				const escapedRoomName = this.getEscapedString(roomName);
+				queryBuilder.andWhere("duelLog.name like :escapedRoomName", { escapedRoomName });
+			}
+			if(duelCount != null && !isNaN(duelCount)) {
+				queryBuilder.andWhere("duelLog.duelCount = :duelCount", { duelCount });
+			}
+			if(playerName != null && playerName.length || playerScore != null && !isNaN(playerScore)) {
+				let innerQuery = "select id from duel_log_player where duel_log_player.duelLogId = duelLog.id";
+				const innerQueryParams: any = {};
+				if(playerName != null && playerName.length) {
+					const escapedPlayerName = this.getEscapedString(playerName);
+					innerQuery += " and duel_log_player.realName like :escapedPlayerName";
+					innerQueryParams.escapedPlayerName = escapedPlayerName;
+				}
+				if(playerScore != null && !isNaN(playerScore)) {
+					innerQuery += " and duel_log_player.score = :playerScore";
+					innerQueryParams.playerScore = playerScore;
+				}
+				queryBuilder.andWhere(`exists (${innerQuery})`, innerQueryParams);
+			}
+			queryBuilder.orderBy("duelLog.id", "DESC")
+				.leftJoinAndSelect("duelLog.players", "player");
+			// console.log(queryBuilder.getSql());
+			const duelLogs = await queryBuilder.getMany();
+			return duelLogs;
+		} catch (e) {
+			this.log.warn(`Failed to fetch duel logs: ${e.toString()}`);
+			return [];
+		}
+	}
+
 	async getDuelLogFromId(id: number) {
 		const repo = this.db.getRepository(DuelLog);
 		try {
@@ -291,9 +341,45 @@ export class DataManager {
 		const allDuelLogs = await this.getAllDuelLogs();
 		return allDuelLogs.map(duelLog => duelLog.getViewJSON(tournamentModeSettings));
 	}
+	async getDuelLogJSONFromCondition(tournamentModeSettings: any, data: DuelLogQuery) {
+		const allDuelLogs = await this.getDuelLogFromCondition(data);
+		return allDuelLogs.map(duelLog => duelLog.getViewJSON(tournamentModeSettings));
+	}
 	async getAllReplayFilenames() {
 		const allDuelLogs = await this.getAllDuelLogs();
 		return allDuelLogs.map(duelLog => duelLog.replayFileName);
+	}
+	async getReplayFilenamesFromCondition(data: DuelLogQuery) {
+		const allDuelLogs = await this.getDuelLogFromCondition(data);
+		return allDuelLogs.map(duelLog => duelLog.replayFileName);
+	}
+	async getReplayArchiveStreamFromCondition(rootPath: string, data: DuelLogQuery) {
+		const filenames = await this.getReplayFilenamesFromCondition(data);
+		if(!filenames.length) {
+			return null;
+		}
+		try {
+			const zip = new JSZip();
+			for(let fileName of filenames) {
+				const filePath = `${rootPath}${fileName}`;
+				try {
+					await fs.promises.access(filePath);
+					zip.file(fileName, fs.promises.readFile(filePath));
+				} catch(e) {
+					this.log.warn(`Errored archiving ${filePath}: ${e.toString()}`)
+					continue;
+				}
+			}
+			return zip.generateNodeStream({
+				compression: "DEFLATE",
+				compressionOptions: {
+					level: 9
+				}
+			});
+		} catch(e2) {
+			this.log.warn(`Errored creating archive: ${e2.toString()}`)
+			return null;
+		}
 	}
 	async clearDuelLog() {
 		const runner = this.db.createQueryRunner();

@@ -2071,7 +2071,7 @@ deck_name_match = global.deck_name_match = (deck_name, player_name) ->
 ygopro.ctos_follow 'PLAYER_INFO', true, (buffer, info, client, server, datas)->
   # checkmate use username$password, but here don't
   # so remove the password
-  name_full =info.name.split("$")
+  name_full =info.name.replace(/\\/g, "").split("$")
   name = name_full[0]
   vpass = name_full[1]
   if vpass and !vpass.length
@@ -3950,6 +3950,21 @@ global.rebooted = false
 #http
 if true
 
+  getDuelLogQueryFromQs = (qdata) ->
+    try
+      ret = {}
+      if(qdata.roomname)
+        ret.roomName = decodeURIComponent(qdata.roomname).trim()
+      if(qdata.duelcount)
+        ret.duelCount = parseInt(decodeURIComponent(qdata.duelcount))
+      if(qdata.playername)
+        ret.playerName = decodeURIComponent(qdata.playername).trim()
+      if(qdata.score)
+        ret.playerScore = parseInt(decodeURIComponent(qdata.score))
+      return ret
+    catch
+      return {}
+
   addCallback = (callback, text)->
     if not callback then return text
     return callback + "( " + text + " );"
@@ -4003,7 +4018,7 @@ if true
         return
       else
         response.writeHead(200)
-        duellog = JSON.stringify(await dataManager.getDuelLogJSON(settings.modules.tournament_mode), null, 2)
+        duellog = JSON.stringify(await dataManager.getDuelLogJSONFromCondition(settings.modules.tournament_mode, getDuelLogQueryFromQs(u.query)), null, 2)
         response.end(addCallback(u.query.callback, duellog))
 
     else if u.pathname == '/api/getkeys' and settings.modules.vip.enabled
@@ -4023,38 +4038,20 @@ if true
         return
       else
         try
-          archive_name = moment().format('YYYY-MM-DD HH-mm-ss') + ".zip"
-          archive_args = ["a", "-mx0", "-y", archive_name]
-          check = false
-          for filename in await dataManager.getAllReplayFilenames()
-            check = true
-            archive_args.push(filename)
-          if !check
+          archiveStream = await dataManager.getReplayArchiveStreamFromCondition(settings.modules.tournament_mode.replay_path, getDuelLogQueryFromQs(u.query))
+          if !archiveStream
             response.writeHead(403)
-            response.end("Duel logs not found.")
+            response.end("Replay not found.")
             return
-          archive_process = spawn settings.modules.tournament_mode.replay_archive_tool, archive_args, {cwd: settings.modules.tournament_mode.replay_path}
-          archive_process.on 'error', (err)=>
-            response.writeHead(403)
-            response.end("Failed packing replays. " + err)
-            return
-          archive_process.on 'exit', (code)=>
-            fs.readFile(settings.modules.tournament_mode.replay_path + archive_name, (error, buffer)->
-              if error
-                response.writeHead(403)
-                response.end("Failed sending replays. " + error)
-                return
-              else
-                response.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Disposition": "attachment" })
-                response.end(buffer)
-                return
-            )
-          archive_process.stdout.setEncoding 'utf8'
-          archive_process.stdout.on 'data', (data)=>
-            log.info "archive process: " + data
-          archive_process.stderr.setEncoding 'utf8'
-          archive_process.stderr.on 'data', (data)=>
-            log.warn "archive error: " + data
+          response.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Disposition": "attachment" })
+          archiveStream.on "data", (data) ->
+            response.write data
+          archiveStream.on "end", () ->
+            response.end()
+          archiveStream.on "close", () ->
+            log.warn("Archive closed")
+          archiveStream.on "error", (error) ->
+            log.warn("Archive error: #{error}")
         catch error
           response.writeHead(403)
           response.end("Failed reading replays. " + error)
