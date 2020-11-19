@@ -15,6 +15,7 @@ import {UserDialog} from "./entities/UserDialog";
 import {RandomDuelScore} from "./entities/RandomDuelScore";
 import JSZip from "jszip";
 import * as fs from "fs";
+import "reflect-metadata";
 
 interface BasePlayerInfo {
 	name: string;

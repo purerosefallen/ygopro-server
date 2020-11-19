@@ -38,6 +38,7 @@ const UserDialog_1 = require("./entities/UserDialog");
 const RandomDuelScore_1 = require("./entities/RandomDuelScore");
 const jszip_1 = __importDefault(require("jszip"));
 const fs = __importStar(require("fs"));
+require("reflect-metadata");
 class DataManager {
     constructor(config, log) {
         this.config = config;
