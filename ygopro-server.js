@@ -760,10 +760,10 @@
             headers: {
               'content-type': 'application/x-www-form-urlencoded'
             },
+            responseType: "json",
             data: qs.stringify({
               accesskey: settings.modules.random_duel.post_match_accesskey,
-              rank: JSON.stringify(scores),
-              responseType: "json"
+              rank: JSON.stringify(scores)
             })
           });
         } catch (error1) {
@@ -3020,8 +3020,8 @@
               }
               room.private = true;
               room.arena = settings.modules.arena_mode.mode;
+              room.max_player = 2;
               if (room.arena === "athletic") {
-                room.max_player = 2;
                 room.welcome = "${athletic_arena_tip}";
               }
             }
