@@ -3627,7 +3627,7 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
         #log.info("player deck not found: " + client.name)
         ygopro.stoc_send_chat(client, "#{client.name}${deck_not_found}", ygopro.constants.COLORS.RED)
         client.deck_good = false
-  if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and deck_good and !client.is_local and !client.bot_bound
+  if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and client.deck_good and !client.is_local and !client.bot_bound
     client.bot_bound = true
     ygopro.stoc_send_chat(client, "${stand_bot_added}", ygopro.constants.COLORS.BABYBLUE)
     ygopro.stoc_send(client, 'HS_PLAYER_CHANGE', {

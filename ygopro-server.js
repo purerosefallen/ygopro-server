@@ -4853,7 +4853,7 @@
         }
       }
     }
-    if (room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && deck_good && !client.is_local && !client.bot_bound) {
+    if (room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && client.deck_good && !client.is_local && !client.bot_bound) {
       client.bot_bound = true;
       ygopro.stoc_send_chat(client, "${stand_bot_added}", ygopro.constants.COLORS.BABYBLUE);
       ygopro.stoc_send(client, 'HS_PLAYER_CHANGE', {
