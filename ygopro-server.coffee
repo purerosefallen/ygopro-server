@@ -1649,6 +1649,13 @@ class Room
         #log.info "windbot added"
       return
     return
+  
+  kill_bots_with_name: (name) ->
+    stand_bots = room.get_playing_player().filter((player) ->
+      return player.is_local and player.name_vpass == name
+    )
+    for player in stand_bots
+      CLIENT_kick(player)
 
   add_windbot_stand: (name, deckContent)->
     request
@@ -1717,6 +1724,8 @@ class Room
             ROOM_ban_player(client.name, client.ip, "${random_ban_reason_flee}")
             if settings.modules.random_duel.record_match_scores and @random_type == 'M'
               ROOM_player_flee(client.name_vpass)
+      if @duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and !client.is_local and client.bot_bound
+        @kill_bots_with_name(client.name_vpass)
       if @players.length and !(@windbot and client.is_host) and !(@arena and @duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and client.pos <= 3)
         left_name = (if settings.modules.hide_name and @duel_stage == ygopro.constants.DUEL_STAGE.BEGIN then "********" else client.name)
         ygopro.stoc_send_chat_to_room this, "#{left_name} ${left_game}" + if error then ": #{error}" else ''
@@ -2961,11 +2970,7 @@ ygopro.ctos_follow 'HS_TODUELIST', true, (buffer, info, client, server, datas)->
   if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and !client.is_local and client.bot_bound
     ygopro.stoc_send_chat(client, "${stand_bot_removed}", ygopro.constants.COLORS.BABYBLUE)
     client.bot_bound = false
-    stand_bots = room.get_playing_player().filter((player) ->
-      return player.is_local and player.name_vpass == client.name_vpass
-    )
-    for player in stand_bots
-      CLIENT_kick(player)
+    room.kill_bots_with_name(client.name_vpass)
   await return false
 
 ygopro.ctos_follow 'HS_KICK', true, (buffer, info, client, server, datas)->
