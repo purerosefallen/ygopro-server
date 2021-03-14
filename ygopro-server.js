@@ -2196,6 +2196,19 @@
 
     //else
     //log.info "windbot added"
+    kill_bots_with_name(name) {
+      var j, len, player, results, stand_bots;
+      stand_bots = room.get_playing_player().filter(function(player) {
+        return player.is_local && player.name_vpass === name;
+      });
+      results = [];
+      for (j = 0, len = stand_bots.length; j < len; j++) {
+        player = stand_bots[j];
+        results.push(CLIENT_kick(player));
+      }
+      return results;
+    }
+
     add_windbot_stand(name, deckContent) {
       request({
         url: `http://${settings.modules.windbot.server_ip}:${settings.modules.windbot.port}/?name=${encodeURIComponent(name)}&deck=Test&host=${settings.modules.windbot.my_ip}&port=${settings.port}&version=${settings.version}&password=${encodeURIComponent(this.name)}&chat=false&deckcode=${encodeURIComponent(deckContent.toString('base64'))}`
@@ -2296,6 +2309,9 @@
               }
             }
           }
+        }
+        if (this.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && !client.is_local && client.bot_bound) {
+          this.kill_bots_with_name(client.name_vpass);
         }
         if (this.players.length && !(this.windbot && client.is_host) && !(this.arena && this.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && client.pos <= 3)) {
           left_name = (settings.modules.hide_name && this.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN ? "********" : client.name);
@@ -3892,7 +3908,7 @@
   });
 
   ygopro.ctos_follow('HS_TODUELIST', true, async function(buffer, info, client, server, datas) {
-    var j, len, player, room, stand_bots;
+    var room;
     room = ROOM_all[client.rid];
     if (!room) {
       return;
@@ -3900,13 +3916,7 @@
     if (room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && !client.is_local && client.bot_bound) {
       ygopro.stoc_send_chat(client, "${stand_bot_removed}", ygopro.constants.COLORS.BABYBLUE);
       client.bot_bound = false;
-      stand_bots = room.get_playing_player().filter(function(player) {
-        return player.is_local && player.name_vpass === client.name_vpass;
-      });
-      for (j = 0, len = stand_bots.length; j < len; j++) {
-        player = stand_bots[j];
-        CLIENT_kick(player);
-      }
+      room.kill_bots_with_name(client.name_vpass);
     }
     return false;
   });
