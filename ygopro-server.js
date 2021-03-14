@@ -72,7 +72,7 @@
     }
   });
 
-  import_datas = global.import_datas = ["abuse_count", "ban_mc", "vip", "vpass", "rag", "rid", "is_post_watcher", "retry_count", "name", "pass", "name_vpass", "is_first", "lp", "card_count", "is_host", "pos", "surrend_confirm", "kick_count", "deck_saved", "main", "side", "side_interval", "side_tcount", "selected_preduel", "last_game_msg", "last_game_msg_title", "last_hint_msg", "start_deckbuf", "challonge_info", "ready_trap", "join_time", "arena_quit_free", "replays_sent", "victory_words"];
+  import_datas = global.import_datas = ["abuse_count", "ban_mc", "vip", "vpass", "rag", "rid", "is_post_watcher", "retry_count", "name", "pass", "name_vpass", "is_first", "lp", "card_count", "is_host", "pos", "surrend_confirm", "kick_count", "deck_saved", "main", "side", "side_interval", "side_tcount", "selected_preduel", "last_game_msg", "last_game_msg_title", "last_hint_msg", "start_deckbuf", "challonge_info", "ready_trap", "join_time", "arena_quit_free", "replays_sent", "victory_words", "deck_good", "bot_bound"];
 
   merge = require('deepmerge');
 
@@ -2196,6 +2196,19 @@
 
     //else
     //log.info "windbot added"
+    add_windbot_stand(name, deckContent) {
+      request({
+        url: `http://${settings.modules.windbot.server_ip}:${settings.modules.windbot.port}/?name=${encodeURIComponent(name)}&deck=Test&host=${settings.modules.windbot.my_ip}&port=${settings.port}&version=${settings.version}&password=${encodeURIComponent(this.name)}&chat=false&deckcode=${encodeURIComponent(deckContent.toString('base64'))}`
+      }, (error, response, body) => {
+        if (error) {
+          log.warn('windbot add error', error, this.name);
+          ygopro.stoc_send_chat_to_room(this, "${add_windbot_failed}", ygopro.constants.COLORS.RED);
+        }
+      });
+    }
+
+    //else
+    //log.info "windbot added"
     connect(client) {
       var host_player;
       this.players.push(client);
@@ -3878,6 +3891,26 @@
     return false;
   });
 
+  ygopro.ctos_follow('HS_TODUELIST', true, async function(buffer, info, client, server, datas) {
+    var j, len, player, room, stand_bots;
+    room = ROOM_all[client.rid];
+    if (!room) {
+      return;
+    }
+    if (room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && !client.is_local && client.bot_bound) {
+      ygopro.stoc_send_chat(client, "${stand_bot_removed}", ygopro.constants.COLORS.BABYBLUE);
+      client.bot_bound = false;
+      stand_bots = room.get_playing_player().filter(function(player) {
+        return player.is_local && player.name_vpass === client.name_vpass;
+      });
+      for (j = 0, len = stand_bots.length; j < len; j++) {
+        player = stand_bots[j];
+        CLIENT_kick(player);
+      }
+    }
+    return false;
+  });
+
   ygopro.ctos_follow('HS_KICK', true, async function(buffer, info, client, server, datas) {
     var j, len, player, ref, room;
     room = ROOM_all[client.rid];
@@ -4665,6 +4698,10 @@
     return cancel;
   });
 
+  ygopro.ctos_follow('HS_READY', true, async function(buffer, info, client, server, datas) {
+    return client.deck_good && !client.is_local;
+  });
+
   ygopro.ctos_follow('UPDATE_DECK', true, async function(buffer, info, client, server, datas) {
     var buff_main, buff_side, card, current_deck, deck, deck_array, deck_main, deck_side, deck_text, deckbuf, decks, found_deck, i, j, l, len, len1, line, oppo_pos, recover_player_data, recoveredDeck, room, struct, win_pos;
     if (settings.modules.reconnect.enabled && client.pre_reconnecting) {
@@ -4744,6 +4781,7 @@
       }
       room.last_active_time = moment();
     }
+    client.deck_good = true;
     if (room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && room.recovering) {
       recover_player_data = _.find(room.recover_duel_log.players, function(player) {
         return player.realName === client.name_vpass && buffer.compare(Buffer.from(player.startDeckBuffer, "base64")) === 0;
@@ -4761,8 +4799,9 @@
         struct.set("sidec", 1);
         struct.set("deckbuf", [4392470, 4392470]);
         ygopro.stoc_send_chat(client, "${deck_incorrect_reconnect}", ygopro.constants.COLORS.RED);
+        client.deck_good = false;
       }
-    } else if (room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.deck_check) {
+    } else if (room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && settings.modules.tournament_mode.enabled && settings.modules.tournament_mode.deck_check && !client.is_local) {
       decks = (await fs.promises.readdir(settings.modules.tournament_mode.deck_path));
       if (decks.length) {
         struct.set("mainc", 1);
@@ -4805,12 +4844,24 @@
           } else {
             //log.info("bad deck: " + client.name + " / " + buff_main + " / " + buff_side)
             ygopro.stoc_send_chat(client, `\${deck_incorrect_part1} ${found_deck} \${deck_incorrect_part2}`, ygopro.constants.COLORS.RED);
+            client.deck_good = false;
           }
         } else {
           //log.info("player deck not found: " + client.name)
           ygopro.stoc_send_chat(client, `${client.name}\${deck_not_found}`, ygopro.constants.COLORS.RED);
+          client.deck_good = false;
         }
       }
+    }
+    if (room.duel_stage === ygopro.constants.DUEL_STAGE.BEGIN && deck_good && !client.is_local && !client.bot_bound) {
+      client.bot_bound = true;
+      ygopro.stoc_send_chat(client, "${stand_bot_added}", ygopro.constants.COLORS.BABYBLUE);
+      ygopro.stoc_send(client, 'HS_PLAYER_CHANGE', {
+        status: (client.pos << 4) | 0xa
+      });
+      ygopro.ctos_send(server, 'HS_TOOBSERVER');
+      room.add_windbot_stand(client.name_vpass, buffer);
+      return true;
     }
     return false;
   });
