@@ -2198,7 +2198,7 @@
     //log.info "windbot added"
     kill_bots_with_name(name) {
       var j, len, player, results, stand_bots;
-      stand_bots = room.get_playing_player().filter(function(player) {
+      stand_bots = this.get_playing_player().filter(function(player) {
         return player.is_local && player.name_vpass === name;
       });
       results = [];

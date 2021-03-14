@@ -1651,7 +1651,7 @@ class Room
     return
   
   kill_bots_with_name: (name) ->
-    stand_bots = room.get_playing_player().filter((player) ->
+    stand_bots = @get_playing_player().filter((player) ->
       return player.is_local and player.name_vpass == name
     )
     for player in stand_bots
