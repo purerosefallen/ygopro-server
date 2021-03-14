@@ -80,7 +80,9 @@ import_datas = global.import_datas = [
   "join_time",
   "arena_quit_free",
   "replays_sent",
-  "victory_words"
+  "victory_words",
+  "deck_good",
+  "bot_bound"
 ]
 
 merge = require 'deepmerge'
@@ -1648,6 +1650,18 @@ class Room
       return
     return
 
+  add_windbot_stand: (name, deckContent)->
+    request
+      url: "http://#{settings.modules.windbot.server_ip}:#{settings.modules.windbot.port}/?name=#{encodeURIComponent(name)}&deck=Test&host=#{settings.modules.windbot.my_ip}&port=#{settings.port}&version=#{settings.version}&password=#{encodeURIComponent(@name)}&chat=false&deckcode=#{encodeURIComponent(deckContent.toString('base64'))}"
+    , (error, response, body)=>
+      if error
+        log.warn 'windbot add error', error, this.name
+        ygopro.stoc_send_chat_to_room(this, "${add_windbot_failed}", ygopro.constants.COLORS.RED)
+      #else
+        #log.info "windbot added"
+      return
+    return
+
   connect: (client)->
     @players.push client
     client.join_time = moment()
@@ -2941,6 +2955,19 @@ ygopro.ctos_follow 'HS_TOOBSERVER', true, (buffer, info, client, server, datas)-
       return true
   await return false
 
+ygopro.ctos_follow 'HS_TODUELIST', true, (buffer, info, client, server, datas)->
+  room=ROOM_all[client.rid]
+  return unless room
+  if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and !client.is_local and client.bot_bound
+    ygopro.stoc_send_chat(client, "${stand_bot_removed}", ygopro.constants.COLORS.BABYBLUE)
+    client.bot_bound = false
+    stand_bots = room.get_playing_player().filter((player) ->
+      return player.is_local and player.name_vpass == client.name_vpass
+    )
+    for player in stand_bots
+      CLIENT_kick(player)
+  await return false
+
 ygopro.ctos_follow 'HS_KICK', true, (buffer, info, client, server, datas)->
   room=ROOM_all[client.rid]
   return unless room
@@ -3492,6 +3519,9 @@ ygopro.ctos_follow 'CHAT', true, (buffer, info, client, server, datas)->
     return true
   await return cancel
 
+ygopro.ctos_follow 'HS_READY', true, (buffer, info, client, server, datas)->
+  await return client.deck_good and !client.is_local
+
 ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
   if settings.modules.reconnect.enabled and client.pre_reconnecting
     if !CLIENT_is_able_to_reconnect(client) and !CLIENT_is_able_to_kick_reconnect(client)
@@ -3541,6 +3571,7 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
     if client.pos == 0
       room.waiting_for_player = room.waiting_for_player2
     room.last_active_time = moment()
+  client.deck_good = true
   if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and room.recovering
     recover_player_data = _.find(room.recover_duel_log.players, (player) ->
       return player.realName == client.name_vpass and buffer.compare(Buffer.from(player.startDeckBuffer, "base64")) == 0
@@ -3557,7 +3588,8 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
       struct.set("sidec", 1)
       struct.set("deckbuf", [4392470, 4392470])
       ygopro.stoc_send_chat(client, "${deck_incorrect_reconnect}", ygopro.constants.COLORS.RED)
-  else if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.deck_check
+      client.deck_good = false
+  else if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and settings.modules.tournament_mode.enabled and settings.modules.tournament_mode.deck_check and !client.is_local
     decks = await fs.promises.readdir(settings.modules.tournament_mode.deck_path)
     if decks.length
       struct.set("mainc", 1)
@@ -3590,9 +3622,20 @@ ygopro.ctos_follow 'UPDATE_DECK', true, (buffer, info, client, server, datas)->
         else
           #log.info("bad deck: " + client.name + " / " + buff_main + " / " + buff_side)
           ygopro.stoc_send_chat(client, "${deck_incorrect_part1} #{found_deck} ${deck_incorrect_part2}", ygopro.constants.COLORS.RED)
+          client.deck_good = false
       else
         #log.info("player deck not found: " + client.name)
         ygopro.stoc_send_chat(client, "#{client.name}${deck_not_found}", ygopro.constants.COLORS.RED)
+        client.deck_good = false
+  if room.duel_stage == ygopro.constants.DUEL_STAGE.BEGIN and deck_good and !client.is_local and !client.bot_bound
+    client.bot_bound = true
+    ygopro.stoc_send_chat(client, "${stand_bot_added}", ygopro.constants.COLORS.BABYBLUE)
+    ygopro.stoc_send(client, 'HS_PLAYER_CHANGE', {
+      status: (client.pos << 4) | 0xa
+    })
+    ygopro.ctos_send(server, 'HS_TOOBSERVER')
+    room.add_windbot_stand(client.name_vpass, buffer)
+    return true
   await return false
 
 ygopro.ctos_follow 'RESPONSE', false, (buffer, info, client, server, datas)->

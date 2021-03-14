@@ -202,6 +202,8 @@
     "auto_death_part2": " minutes.",
     "athletic_arena_tip": "During an athletic match, a game quit behavior is regarded as a surrender.",
     "windbot_disable_random_room": "By adding the AI, this random game won't get any new player unless they enter the room name:",
+    "stand_bot_added": "Deck confirmed. Adding bot.",
+    "stand_bot_removed": "Deck resetted.",
     "using_athletic_deck": " is using a competitive deck."
   },
   "es-es": {
@@ -553,6 +555,8 @@
     "auto_death_part2": "分钟后，将自动进入加时赛。",
     "athletic_arena_tip": "在竞技匹配中，比赛开始前退出游戏也会视为投降。",
     "windbot_disable_random_room": "因为添加了AI，本随机对战房间将只能通过房间名加入：",
+    "stand_bot_added": "已确认卡组。将添加AI参与决斗。",
+    "stand_bot_removed": "已重置卡组。",
     "using_athletic_deck": " 正在使用竞技卡组。"
   },
  "ko-kr": {
