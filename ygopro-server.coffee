@@ -3020,12 +3020,14 @@ ygopro.stoc_follow 'HS_PLAYER_CHANGE', true, (buffer, info, client, server, data
   is_ready = (info.status & 0xf) == 9
   room.ready_player_count = 0
   room.ready_player_count_without_host = 0
-  for player in room.players
+  for player in room.get_playing_player()
     if player.pos == pos
       player.is_ready = is_ready
     if player.is_ready
       ++room.ready_player_count
-      unless player.is_host
+      unless _.any(room.players, (tplayer) ->
+        return tplayer.pos > 3 and tplayer.name_vpass == player.name_vpass and tplayer.is_host
+      )
         ++room.ready_player_count_without_host
   if settings.modules.athletic_check.enabled
     possibly_max_player = if room.hostinfo.mode == 2 then 4 else 2

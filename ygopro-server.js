@@ -3988,7 +3988,7 @@
     is_ready = (info.status & 0xf) === 9;
     room.ready_player_count = 0;
     room.ready_player_count_without_host = 0;
-    ref = room.players;
+    ref = room.get_playing_player();
     for (j = 0, len = ref.length; j < len; j++) {
       player = ref[j];
       if (player.pos === pos) {
@@ -3996,7 +3996,9 @@
       }
       if (player.is_ready) {
         ++room.ready_player_count;
-        if (!player.is_host) {
+        if (!_.any(room.players, function(tplayer) {
+          return tplayer.pos > 3 && tplayer.name_vpass === player.name_vpass && tplayer.is_host;
+        })) {
           ++room.ready_player_count_without_host;
         }
       }
