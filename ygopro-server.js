@@ -2211,7 +2211,7 @@
 
     add_windbot_stand(name, deckContent) {
       request({
-        url: `http://${settings.modules.windbot.server_ip}:${settings.modules.windbot.port}/?name=${encodeURIComponent(name)}&deck=Test&host=${settings.modules.windbot.my_ip}&port=${settings.port}&version=${settings.version}&password=${encodeURIComponent(this.name)}&chat=false&deckcode=${encodeURIComponent(deckContent.toString('base64'))}`
+        url: `http://${settings.modules.windbot.server_ip}:${settings.modules.windbot.port}/?name=${encodeURIComponent(name)}&deck=Lucky&host=${settings.modules.windbot.my_ip}&port=${settings.port}&version=${settings.version}&password=${encodeURIComponent(this.name)}&chat=false&deckcode=${encodeURIComponent(deckContent.toString('base64'))}`
       }, (error, response, body) => {
         if (error) {
           log.warn('windbot add error', error, this.name);
