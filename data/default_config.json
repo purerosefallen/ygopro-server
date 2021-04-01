@@ -63,7 +63,7 @@
     "tips": {
       "enabled": true,
       "split_zh": false,
-      "get": false,
+      "get": "https://api.moecube.com/biu-tips/tips.json",
       "get_zh": false
     },
     "dialogues": {
