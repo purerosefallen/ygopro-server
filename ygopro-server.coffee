@@ -1420,6 +1420,7 @@ class Room
       @process = spawn './ygopro', param, {cwd: 'ygopro'}
       @process_pid = @process.pid
       @process.on 'error', (err)=>
+        log.warn 'CREATE ROOM ERROR', err
         _.each @players, (player)->
           ygopro.stoc_die(player, "${create_room_failed}")
         this.delete()
@@ -1456,7 +1457,8 @@ class Room
           @send_replays()
           @process.kill()
         return
-    catch
+    catch e
+      log.warn 'CREATE ROOM FAIL', e
       @error = "${create_room_failed}"
   delete: ->
     return if @deleted
