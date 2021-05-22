@@ -3113,6 +3113,8 @@
         }
         if (!room) {
           ygopro.stoc_die(client, "${server_full}");
+        } else if (room.error) {
+          ygopro.stoc_die(client, room.error);
         } else {
           room.join_player(client);
         }
@@ -3195,8 +3197,8 @@
                 buffer = decrypted_buffer;
               }
             } else {
-              log.warn("READ USER FAIL", error, body);
-              done("${create_room_failed}");
+              log.warn("READ USER FAIL", client.name, error, body);
+              done("${load_user_info_fail}");
               return;
             }
             if (!check_buffer_indentity(buffer)) {
@@ -3301,6 +3303,8 @@
           }
           if (!room) {
             ygopro.stoc_die(client, "${server_full}");
+          } else if (room.error) {
+            ygopro.stoc_die(client, room.error);
           } else {
             room.join_player(client);
           }
@@ -3346,6 +3350,8 @@
       room = (await ROOM_find_or_create_by_name(info.pass, client.ip));
       if (!room) {
         ygopro.stoc_die(client, "${server_full}");
+      } else if (room.error) {
+        ygopro.stoc_die(client, room.error);
       } else {
         room.join_player(client);
       }
