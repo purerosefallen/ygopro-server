@@ -1,5 +1,5 @@
 # Dockerfile for SRVPro
-FROM debian:buster-slim as premake-builder
+FROM debian:buster as premake-builder
 
 RUN apt update && \
     env DEBIAN_FRONTEND=noninteractive apt install -y wget build-essential p7zip-full && \
@@ -9,7 +9,7 @@ WORKDIR /usr/src
 RUN wget -O premake.zip https://github.com/premake/premake-core/releases/download/v5.0.0-alpha14/premake-5.0.0-alpha14-src.zip && \
     7z x -y premake.zip && \
     mv premake-5.0.0-alpha14 premake && \
-    cd premake/build/gmake2.unix && \
+    cd premake/build/gmake.unix && \
     make -j$(nproc)
 
 
