@@ -352,8 +352,37 @@ init = () ->
     settings.modules.random_duel.blank_pass_modes = {"S":true,"M":true,"T":false}
     delete settings.modules.random_duel.blank_pass_match
     imported = true
+  #import the old random_duel.blank_pass_match option
+  if settings.modules.random_duel.blank_pass_match == true
+    settings.modules.random_duel.blank_pass_modes = {
+          "S": true,
+          "M": true,
+          "T": false,
+          "OOR": true,
+          "TOR": true,
+          "OR": true,
+          "TR": true,
+          "OOMR": true,
+          "TOMR": true,
+          "OMR": true,
+          "TMR": true
+        }
+    delete settings.modules.random_duel.blank_pass_match
+    imported = true
   if settings.modules.random_duel.blank_pass_match == false
-    settings.modules.random_duel.blank_pass_modes = {"S":true,"M":false,"T":false}
+    settings.modules.random_duel.blank_pass_modes = {
+          "S": true,
+          "M": true,
+          "T": false,
+          "OOR": true,
+          "TOR": true,
+          "OR": true,
+          "TR": true,
+          "OOMR": false,
+          "TOMR": false,
+          "OMR": false,
+          "TMR": false
+        }
     delete settings.modules.random_duel.blank_pass_match
     imported = true
   #finish
@@ -775,7 +804,7 @@ ROOM_find_or_create_by_name = global.ROOM_find_or_create_by_name = (name, player
   uname=name.toUpperCase()
   if settings.modules.windbot.enabled and (uname[0...2] == 'AI' or (!settings.modules.random_duel.enabled and uname == ''))
     return ROOM_find_or_create_ai(name)
-  if settings.modules.random_duel.enabled and (uname == '' or uname == 'S' or uname == 'M' or uname == 'T')
+  if settings.modules.random_duel.enabled and (uname == '' or uname == 'S' or uname == 'M' or uname == 'T' or uname == 'TOR' or uname == 'TR' or uname == 'OOR' or uname == 'OR' or uname == 'TOMR' or uname == 'TMR' or uname == 'OOMR' or uname == 'OMR')
     return await ROOM_find_or_create_random(uname, player_ip)
   if room = ROOM_find_by_name(name)
     return room
@@ -1327,6 +1356,42 @@ class Room
       if (rule.match /(^|，|,)(T|TAG)(，|,|$)/)
         @hostinfo.mode = 2
         @hostinfo.start_lp = 16000
+
+      if (rule.match /(^|，|,)(OOR|OCGONLYRANDOM)(，|,|$)/)
+        @hostinfo.rule = 0
+        @hostinfo.lflist = 0
+
+      if (rule.match /(^|，|,)(OR|OCGRANDOM)(，|,|$)/)
+        @hostinfo.rule = 2
+        @hostinfo.lflist = 0
+
+      if (rule.match /(^|，|,)(TOR|TCGONLYRANDOM)(，|,|$)/)
+        @hostinfo.rule = 1
+        @hostinfo.lflist = _.findIndex lflists, (list)-> list.tcg
+
+      if (rule.match /(^|，|,)(TR|TCGRANDOM)(，|,|$)/)
+        @hostinfo.rule = 2
+        @hostinfo.lflist = _.findIndex lflists, (list)-> list.tcg
+
+      if (rule.match /(^|，|,)(OOMR|OCGONLYMATCHRANDOM)(，|,|$)/)
+        @hostinfo.rule = 0
+        @hostinfo.lflist = 0
+        @hostinfo.mode = 1
+
+      if (rule.match /(^|，|,)(OMR|OCGMATCHRANDOM)(，|,|$)/)
+        @hostinfo.rule = 2
+        @hostinfo.lflist = 0
+        @hostinfo.mode = 1
+
+      if (rule.match /(^|，|,)(TOMR|TCGONLYMATCHRANDOM)(，|,|$)/)
+        @hostinfo.rule = 1
+        @hostinfo.lflist = _.findIndex lflists, (list)-> list.tcg
+        @hostinfo.mode = 1
+
+      if (rule.match /(^|，|,)(TMR|TCGMATCHRANDOM)(，|,|$)/)
+        @hostinfo.rule = 2
+        @hostinfo.lflist = _.findIndex lflists, (list)-> list.tcg
+        @hostinfo.mode = 1
 
       if (rule.match /(^|，|,)(TCGONLY|TO)(，|,|$)/)
         @hostinfo.rule = 1
@@ -3154,6 +3219,11 @@ ygopro.stoc_follow 'DUEL_START', false, (buffer, info, client, server, datas)->
       deck_arena = deck_arena + room.arena
     else if room.hostinfo.mode == 2
       deck_arena = deck_arena + 'tag'
+    else if room.random_type and _.endsWith(room.random_type, 'R')
+      if _.endsWith(room.random_type, 'MR')
+        deck_arena = deck_arena + 'athletic'
+      else
+        deck_arena = deck_arena + 'entertain'
     else if room.random_type == 'S'
       deck_arena = deck_arena + 'entertain'
     else if room.random_type == 'M'

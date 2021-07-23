@@ -462,11 +462,37 @@
       delete settings.modules.random_duel.blank_pass_match;
       imported = true;
     }
+    //import the old random_duel.blank_pass_match option
+    if (settings.modules.random_duel.blank_pass_match === true) {
+      settings.modules.random_duel.blank_pass_modes = {
+        "S": true,
+        "M": true,
+        "T": false,
+        "OOR": true,
+        "TOR": true,
+        "OR": true,
+        "TR": true,
+        "OOMR": true,
+        "TOMR": true,
+        "OMR": true,
+        "TMR": true
+      };
+      delete settings.modules.random_duel.blank_pass_match;
+      imported = true;
+    }
     if (settings.modules.random_duel.blank_pass_match === false) {
       settings.modules.random_duel.blank_pass_modes = {
         "S": true,
-        "M": false,
-        "T": false
+        "M": true,
+        "T": false,
+        "OOR": true,
+        "TOR": true,
+        "OR": true,
+        "TR": true,
+        "OOMR": false,
+        "TOMR": false,
+        "OMR": false,
+        "TMR": false
       };
       delete settings.modules.random_duel.blank_pass_match;
       imported = true;
@@ -1005,7 +1031,7 @@
     if (settings.modules.windbot.enabled && (uname.slice(0, 2) === 'AI' || (!settings.modules.random_duel.enabled && uname === ''))) {
       return ROOM_find_or_create_ai(name);
     }
-    if (settings.modules.random_duel.enabled && (uname === '' || uname === 'S' || uname === 'M' || uname === 'T')) {
+    if (settings.modules.random_duel.enabled && (uname === '' || uname === 'S' || uname === 'M' || uname === 'T' || uname === 'TOR' || uname === 'TR' || uname === 'OOR' || uname === 'OR' || uname === 'TOMR' || uname === 'TMR' || uname === 'OOMR' || uname === 'OMR')) {
       return (await ROOM_find_or_create_random(uname, player_ip));
     }
     if (room = ROOM_find_by_name(name)) {
@@ -1738,6 +1764,50 @@
         if (rule.match(/(^|，|,)(T|TAG)(，|,|$)/)) {
           this.hostinfo.mode = 2;
           this.hostinfo.start_lp = 16000;
+        }
+        if (rule.match(/(^|，|,)(OOR|OCGONLYRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 0;
+          this.hostinfo.lflist = 0;
+        }
+        if (rule.match(/(^|，|,)(OR|OCGRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 2;
+          this.hostinfo.lflist = 0;
+        }
+        if (rule.match(/(^|，|,)(TOR|TCGONLYRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 1;
+          this.hostinfo.lflist = _.findIndex(lflists, function(list) {
+            return list.tcg;
+          });
+        }
+        if (rule.match(/(^|，|,)(TR|TCGRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 2;
+          this.hostinfo.lflist = _.findIndex(lflists, function(list) {
+            return list.tcg;
+          });
+        }
+        if (rule.match(/(^|，|,)(OOMR|OCGONLYMATCHRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 0;
+          this.hostinfo.lflist = 0;
+          this.hostinfo.mode = 1;
+        }
+        if (rule.match(/(^|，|,)(OMR|OCGMATCHRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 2;
+          this.hostinfo.lflist = 0;
+          this.hostinfo.mode = 1;
+        }
+        if (rule.match(/(^|，|,)(TOMR|TCGONLYMATCHRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 1;
+          this.hostinfo.lflist = _.findIndex(lflists, function(list) {
+            return list.tcg;
+          });
+          this.hostinfo.mode = 1;
+        }
+        if (rule.match(/(^|，|,)(TMR|TCGMATCHRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 2;
+          this.hostinfo.lflist = _.findIndex(lflists, function(list) {
+            return list.tcg;
+          });
+          this.hostinfo.mode = 1;
         }
         if (rule.match(/(^|，|,)(TCGONLY|TO)(，|,|$)/)) {
           this.hostinfo.rule = 1;
@@ -4218,6 +4288,12 @@
         deck_arena = deck_arena + room.arena;
       } else if (room.hostinfo.mode === 2) {
         deck_arena = deck_arena + 'tag';
+      } else if (room.random_type && _.endsWith(room.random_type, 'R')) {
+        if (_.endsWith(room.random_type, 'MR')) {
+          deck_arena = deck_arena + 'athletic';
+        } else {
+          deck_arena = deck_arena + 'entertain';
+        }
       } else if (room.random_type === 'S') {
         deck_arena = deck_arena + 'entertain';
       } else if (room.random_type === 'M') {

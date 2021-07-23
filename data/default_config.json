@@ -89,7 +89,15 @@
       "blank_pass_modes": {
         "S": true,
         "M": true,
-        "T": false
+        "T": false,
+        "OOR": true,
+        "TOR": true,
+        "OR": true,
+        "TR": true,
+        "OOMR": true,
+        "TOMR": true,
+        "OMR": true,
+        "TMR": true
       },
       "ready_time": 20,
       "hang_timeout": 90
