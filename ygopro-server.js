@@ -472,10 +472,12 @@
         "TOR": true,
         "OR": true,
         "TR": true,
+        "CR": true,
         "OOMR": true,
         "TOMR": true,
         "OMR": true,
-        "TMR": true
+        "TMR": true,
+        "CMR": true
       };
       delete settings.modules.random_duel.blank_pass_match;
       imported = true;
@@ -489,10 +491,12 @@
         "TOR": true,
         "OR": true,
         "TR": true,
+        "CR": true,
         "OOMR": false,
         "TOMR": false,
         "OMR": false,
-        "TMR": false
+        "TMR": false,
+        "CMR": false
       };
       delete settings.modules.random_duel.blank_pass_match;
       imported = true;
@@ -1031,7 +1035,7 @@
     if (settings.modules.windbot.enabled && (uname.slice(0, 2) === 'AI' || (!settings.modules.random_duel.enabled && uname === ''))) {
       return ROOM_find_or_create_ai(name);
     }
-    if (settings.modules.random_duel.enabled && (uname === '' || uname === 'S' || uname === 'M' || uname === 'T' || uname === 'TOR' || uname === 'TR' || uname === 'OOR' || uname === 'OR' || uname === 'TOMR' || uname === 'TMR' || uname === 'OOMR' || uname === 'OMR')) {
+    if (settings.modules.random_duel.enabled && (uname === '' || uname === 'S' || uname === 'M' || uname === 'T' || uname === 'TOR' || uname === 'TR' || uname === 'OOR' || uname === 'OR' || uname === 'TOMR' || uname === 'TMR' || uname === 'OOMR' || uname === 'OMR' || uname === 'CR' || uname === 'CMR')) {
       return (await ROOM_find_or_create_random(uname, player_ip));
     }
     if (room = ROOM_find_by_name(name)) {
@@ -1773,6 +1777,10 @@
           this.hostinfo.rule = 2;
           this.hostinfo.lflist = 0;
         }
+        if (rule.match(/(^|，|,)(CR|CCGRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 4;
+          this.hostinfo.lflist = -1;
+        }
         if (rule.match(/(^|，|,)(TOR|TCGONLYRANDOM)(，|,|$)/)) {
           this.hostinfo.rule = 1;
           this.hostinfo.lflist = _.findIndex(lflists, function(list) {
@@ -1793,6 +1801,11 @@
         if (rule.match(/(^|，|,)(OMR|OCGMATCHRANDOM)(，|,|$)/)) {
           this.hostinfo.rule = 2;
           this.hostinfo.lflist = 0;
+          this.hostinfo.mode = 1;
+        }
+        if (rule.match(/(^|，|,)(CMR|CCGMATCHRANDOM)(，|,|$)/)) {
+          this.hostinfo.rule = 4;
+          this.hostinfo.lflist = -1;
           this.hostinfo.mode = 1;
         }
         if (rule.match(/(^|，|,)(TOMR|TCGONLYMATCHRANDOM)(，|,|$)/)) {

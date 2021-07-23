@@ -362,10 +362,12 @@ init = () ->
           "TOR": true,
           "OR": true,
           "TR": true,
+          "CR": true,
           "OOMR": true,
           "TOMR": true,
           "OMR": true,
-          "TMR": true
+          "TMR": true,
+          "CMR": true
         }
     delete settings.modules.random_duel.blank_pass_match
     imported = true
@@ -378,10 +380,12 @@ init = () ->
           "TOR": true,
           "OR": true,
           "TR": true,
+          "CR": true,
           "OOMR": false,
           "TOMR": false,
           "OMR": false,
-          "TMR": false
+          "TMR": false,
+          "CMR": false
         }
     delete settings.modules.random_duel.blank_pass_match
     imported = true
@@ -804,7 +808,7 @@ ROOM_find_or_create_by_name = global.ROOM_find_or_create_by_name = (name, player
   uname=name.toUpperCase()
   if settings.modules.windbot.enabled and (uname[0...2] == 'AI' or (!settings.modules.random_duel.enabled and uname == ''))
     return ROOM_find_or_create_ai(name)
-  if settings.modules.random_duel.enabled and (uname == '' or uname == 'S' or uname == 'M' or uname == 'T' or uname == 'TOR' or uname == 'TR' or uname == 'OOR' or uname == 'OR' or uname == 'TOMR' or uname == 'TMR' or uname == 'OOMR' or uname == 'OMR')
+  if settings.modules.random_duel.enabled and (uname == '' or uname == 'S' or uname == 'M' or uname == 'T' or uname == 'TOR' or uname == 'TR' or uname == 'OOR' or uname == 'OR' or uname == 'TOMR' or uname == 'TMR' or uname == 'OOMR' or uname == 'OMR' or uname == 'CR' or uname == 'CMR')
     return await ROOM_find_or_create_random(uname, player_ip)
   if room = ROOM_find_by_name(name)
     return room
@@ -1365,6 +1369,10 @@ class Room
         @hostinfo.rule = 2
         @hostinfo.lflist = 0
 
+      if (rule.match /(^|，|,)(CR|CCGRANDOM)(，|,|$)/)
+        @hostinfo.rule = 4
+        @hostinfo.lflist = -1
+
       if (rule.match /(^|，|,)(TOR|TCGONLYRANDOM)(，|,|$)/)
         @hostinfo.rule = 1
         @hostinfo.lflist = _.findIndex lflists, (list)-> list.tcg
@@ -1381,6 +1389,11 @@ class Room
       if (rule.match /(^|，|,)(OMR|OCGMATCHRANDOM)(，|,|$)/)
         @hostinfo.rule = 2
         @hostinfo.lflist = 0
+        @hostinfo.mode = 1
+
+      if (rule.match /(^|，|,)(CMR|CCGMATCHRANDOM)(，|,|$)/)
+        @hostinfo.rule = 4
+        @hostinfo.lflist = -1
         @hostinfo.mode = 1
 
       if (rule.match /(^|，|,)(TOMR|TCGONLYMATCHRANDOM)(，|,|$)/)

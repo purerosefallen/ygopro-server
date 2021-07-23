@@ -94,9 +94,11 @@
         "TOR": true,
         "OR": true,
         "TR": true,
+        "CR": true,
         "OOMR": true,
         "TOMR": true,
         "OMR": true,
+        "CMR": true,
         "TMR": true
       },
       "ready_time": 20,
